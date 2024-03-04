@@ -9,10 +9,14 @@ This is my take on the one billion row challenge: [gunnarmorling/1brc at Github]
 - [Other Solutions](#other-solutions)
   - [Using Go](#using-go)
 - [Benchmarks](#benchmarks)
-  - [Comparison Times](#comparison-times)
+  - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
     - [Naive (G)AWK](#naive-gawk)
+  - [Go Solution by Shraddha Agrawal](#go-solution-by-shraddha-agrawal)
+  - [Go Solution by Ben Hoyt](#go-solution-by-ben-hoyt)
+  - [Go Solution by Alexander Yastrebov](#go-solution-by-alexander-yastrebov)
+- [Results](#results)
 - [Files](#files)
   - [Data and Java Reference Implementation](#data-and-java-reference-implementation)
 - [License](#license)
@@ -51,7 +55,7 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
 
 - While 1 billion sounds like much, we can keep everything (the whole data file and the intermediate data) in 32GB RAM. So no need to think about memory. Which means that if you have less RAM, you should scale the number of rows accordingly (`500_000_000`, 500 millions if you've got 16GB, `250_000_000` if you've got 8GB, ...).
 - A maximum of 10,000 unique station names: so we can set all capacities to 10,000 and won't need to reallocate when dynamically growing. This implies, that there is a maximum number of 100,000 (1,000,000,000 / 10,000) temperatures per station.
-- All float values are in the inclusive interval `[-99.9, 99.9]` and have exactly (always!) one decimal digit. So if we parse these as integers, we get values in the interval `[-990, 990]`. Having a maximum of 10,000 stations implies, that the sums of these integer values are (always) in `[-9 900 000, 9 900 000]`. This is a sub-interval of `[-2^24, 2^24] == [-16 777 216, 16 777 216]`, so 32 bit integers suffice to hold all needed values. A (well, the usual ones) 32 bit float has a mantissa that can hold exactly 23 bits + 1 (in normalized form), so we don't loose precision when converting the integer values to a 32 bit float.
+- All float values are in the inclusive interval `[-99.9, 99.9]` and have exactly (always!) one decimal digit. So if we parse these as integers, we get values in the interval `[-990, 990]`. Having a maximum of 100,000 temperature values implies that the sums of these integer values are (always) in `[-99 000 000, 99 000 000]`. This is a sub-interval of `[-2^27, 2^27] == [-134 217 728, 134 217 728]`, so 32 bit integers suffice to hold the sum of the temperature values.
 - The max length of 100 bytes of the names => we can use a fixed 100 byte buffer to parse them into.
 
 ## How to Run
@@ -104,7 +108,16 @@ Detailed specs:
 - 16-core Neural Engine
 - 400GB/s memory bandwidth
 
-### Comparison Times
+Benchmark of [./go_single_thread.go](./go_single_thread.go): 98s, 1.6 minutes, 1 minute 38 seconds.
+
+```shell
+hyperfine -r 5 -w 1 './go_single_thread measurements_big.txt > solution_big.txt'
+Benchmark 1: ./go_single_thread measurements_big.txt > solution_big.txt
+  Time (mean ± σ):     98.484 s ±  1.296 s    [User: 90.378 s, System: 3.329 s]
+  Range (min … max):   96.970 s … 100.237 s    5 runs
+```
+
+### Comparison
 
 #### wc
 
@@ -179,17 +192,76 @@ time gawk -f awk.awk measurements.txt > solution.txt
 gawk -f awk.awk measurements_big.txt > solution_big.txt  595.04s user 3.70s system 99% cpu 10:00.36 total
 ```
 
+### Go Solution by Shraddha Agrawal
+
+The Go solution from the blog post [One Billion Rows Challenge in Golang](https://www.bytesizego.com/blog/one-billion-row-challenge-go). I had to add code to get output on Stdout, this program did not print the results. This takes about 12s.
+
+```shell
+hyperfine -r 5 -w 1 './go_Shraddha_Agrawal -input measurements.txt > solution.txt'
+Benchmark 1: ./go_Shraddha_Agrawal -input measurements.txt > solution.txt
+  Time (mean ± σ):     12.141 s ±  0.318 s    [User: 98.765 s, System: 1.857 s]
+  Range (min … max):   11.736 s … 12.539 s    5 runs
+```
+
+### Go Solution by Ben Hoyt
+
+This is the fasted version (R9) from the Blog post [The One Billion Row Challenge in Go: from 1m45s to 4s in nine solutions](https://benhoyt.com/writings/go-1brc/). **This version does not produce the correct mean values, it generates `-0.0` instead of `0.0` as the average for some stations**.
+
+I needed to change the source to be able to have a comparable version for the benchmark. It did use 12 Threads, but took 75s (1:15 minutes), so maybe I did make some error when adding the main function to call it.
+
+```shell
+hyperfine -r 5 -w 1 './go_Ben_Hoyt measurements.txt > solution.txt'
+Benchmark 1: ./go_Ben_Hoyt measurements.txt > solution.txt
+  Time (mean ± σ):     74.583 s ±  1.005 s    [User: 696.073 s, System: 2.520 s]
+  Range (min … max):   73.364 s … 76.123 s    5 runs
+```
+
+### Go Solution by Alexander Yastrebov
+
+This program needs about 4s. The source can be found [1BRC - Go](https://github.com/gunnarmorling/1brc/blob/main/src/main/go/AlexanderYastrebov/calc.go).
+
+```shell
+hyperfine -r 5 -w 1 './go_Alexander_Yastrebov measurements.txt > solution.txt'
+Benchmark 1: ./go_Alexander_Yastrebov measurements.txt > solution.txt
+  Time (mean ± σ):      4.027 s ±  0.020 s    [User: 35.769 s, System: 1.355 s]
+  Range (min … max):    4.003 s …  4.049 s    5 runs
+```
+
+## Results
+
+For details see [Benchmarks](#benchmarks)
+
+- `wc -l`: the time `wc -l measurements.txt` takes. Just the number of lines.
+- [./awk.awk](./awk.awk): the time `gawk -f awk.awk measurements.txt > solution.txt` takes. A naive, single threaded GAWK implementation.
+- [Java Reference Implementation](./CalculateAverage_baseline.java): the time `java CalculateAverage_baseline.java > correct_results.txt` takes. 1BRC's reference implementation (naive implementation).
+- `Go Alexander Yastrebov`: fastest Go version of [1BRC - Go](https://github.com/gunnarmorling/1brc/blob/main/src/main/go/AlexanderYastrebov/calc.go)
+- `Go Shraddha Agrawal`: fasted Version of [One Billion Rows Challenge in Golang](https://www.bytesizego.com/blog/one-billion-row-challenge-go)
+- `Go Ben Hoyt`: does not produce the correct output, fastest version of [The One Billion Row Challenge in Go: from 1m45s to 4s in nine solutions](https://benhoyt.com/writings/go-1brc/).
+- [./go_single_thread.go](./go_single_thread.go): my baseline Go version, single threaded and using a map of structures.
+
+| Program                       | Time |
+| ----------------------------- | ---- |
+| wc -l                         | 17s  |
+| awk.awk                       | 600s |
+| Java Reference Implementation | 220s |
+| Go Alexander Yastrebov        | 4s   |
+| Go Shraddha Agrawal           | 12s  |
+| Go Ben Hoyt*                  | 75s  |
+| go_single_thread.go           | 98s  |
+
 ## Files
 
 This is a description of the files in this repository and the generated files, which are not checked in to Git.
 
 - [./awk.awk](./awk.awk): straightforward GNU AWK implementation, to get a baseline time. Needs GNU awk, `gawk` to run, POSIX `awk` is not supported because of the sorting function it uses.
+- [./go_single_thread.go](./go_single_thread.go): the baseline go version, single threaded and using a map of structures.
 
 ### Data and Java Reference Implementation
 
 - [measurements.txt](./measurements.txt): the data file generated by the Python script [./create_measurements.py](./create_measurements.py). Not checked in to Git. To generate, see the [How to Run](#how-to-run) section above.
 - [./correct_results.txt](./correct_results.txt): the "official" output file generated by the baseline Java implementation [./CalculateAverage_baseline.java](./CalculateAverage_baseline.java), the reference solution to compare all others against. Not checked in to Git. To generate, see the [How to Run](#how-to-run) section above.
 - [./weather_stations.csv](./weather_stations.csv): the CSV file used as input for the Python script [./create_measurements.py](./create_measurements.py).
+- [./create_measurements.py](./create_measurements.py): the Python script used to generate the data file [./measurements.txt](./measurements.txt).
 - [./CalculateAverage_baseline.java](./CalculateAverage_baseline.java): the baseline Java implementation used to generate the "official" output file [./correct_results.txt](./correct_results.txt).
 
 ## License
