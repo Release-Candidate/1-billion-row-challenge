@@ -1,1 +1,8 @@
-measurements.txt
+# data file and generated reference solution to compare against.
+measurements*.txt
+correct_results*.txt
+# actual solution
+solution*.txt
+
+# generated binaries
+go_single_thread
