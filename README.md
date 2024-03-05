@@ -9,6 +9,9 @@ This is my take on the one billion row challenge: [gunnarmorling/1brc at Github]
 - [Other Solutions](#other-solutions)
   - [Using Go](#using-go)
 - [Benchmarks](#benchmarks)
+  - [Map of Records to Map of Indices into Arrays](#map-of-records-to-map-of-indices-into-arrays)
+  - [Integer Sizes of the Temperature Arrays](#integer-sizes-of-the-temperature-arrays)
+  - [Not Searching for the Newline Character, Not Parsing Twice](#not-searching-for-the-newline-character-not-parsing-twice)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -99,6 +102,19 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
    diff correct_results.txt ./solution.txt
    ```
 
+7. Compile and benchmark the single threaded Go version not searching for the newline, so only parsing that part once:
+
+    ```shell
+    go build ./go_single_thread_arrays_single_parse.go
+    hyperfine -r 5 -w 1 './go_single_thread_arrays_single_parse measurements.txt > solution.txt'
+    ```
+
+8. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
 ## Other Solutions
 
 Official Java implementations: [1BRC - Results](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#results)
@@ -130,13 +146,162 @@ Benchmark 1: ./go_single_thread measurements_big.txt > solution_big.txt
   Range (min … max):   96.970 s … 100.237 s    5 runs
 ```
 
-Benchmark of [./go_single_thread_arrays.go](./go_single_thread_arrays.go): 71s, 27s less than `./go_single_thread`.
+### Map of Records to Map of Indices into Arrays
+
+Turing the naive hash map
+
+```go
+type stationTemperature struct {
+  TempSum int32
+  Count   uint32
+  Min     int16
+  Max     int16
+}
+
+stationData := make(map[string]stationTemperature, 10_000)
+```
+
+into a map of indices into arrays:
+
+```go
+type stationTemperatures struct {
+  TempSum []int32
+  Count   []uint32
+  Min     []int16
+  Max     []int16
+}
+
+stationIdxMap := make(map[string]int, 10_000)
+stationData := stationTemperatures{
+  TempSum: make([]int32, 10_000),
+  Count:   make([]uint32, 10_000),
+  Min:     make([]int16, 10_000),
+  Max:     make([]int16, 10_000),
+}
+```
+
+Benchmark of [./go_single_thread_arrays.go](./go_single_thread_arrays.go): 71s, 27s less than `./go_single_thread.go`.
 
 ```shell
 hyperfine -r 5 -w 1 './go_single_thread_arrays measurements.txt > solution.txt'
 Benchmark 1: ./go_single_thread_arrays measurements.txt > solution.txt
   Time (mean ± σ):     70.707 s ±  0.282 s    [User: 66.361 s, System: 1.657 s]
   Range (min … max):   70.288 s … 71.007 s    5 runs
+```
+
+### Integer Sizes of the Temperature Arrays
+
+Changing the integer sizes of the arrays holding the temperature data from 16 bits to 32 bits makes the program run a bit slower.
+
+So changing this:
+
+```go
+type stationTemperatures struct {
+  TempSum []int32
+  Count   []uint32
+  Min     []int16
+  Max     []int16
+}
+```
+
+into this:
+
+```go
+type stationTemperatures struct {
+  TempSum []int32
+  Count   []uint32
+  Min     []int32
+  Max     []int32
+}
+```
+
+make the program run 1s slower (72s instead of 71s).
+
+But using "native" (in my case, 64 bit `int` and `uint`) gains 3s.
+
+So changing this:
+
+```go
+type stationTemperatures struct {
+  TempSum []int32
+  Count   []uint32
+  Min     []int16
+  Max     []int16
+}
+```
+
+into this:
+
+```go
+type stationTemperatures struct {
+  TempSum []int
+  Count   []uint
+  Min     []int
+  Max     []int
+}
+```
+
+takes the time down from 71s to 68s.
+
+```shell
+hyperfine -r 5 -w 1 './go_single_thread_arrays_64bit_ints measurements.txt > solution.txt'
+Benchmark 1: ./go_single_thread_arrays_64bit_ints measurements.txt > solution.txt
+  Time (mean ± σ):     67.944 s ±  0.278 s    [User: 63.349 s, System: 2.022 s]
+  Range (min … max):   67.603 s … 68.290 s    5 runs
+```
+
+### Not Searching for the Newline Character, Not Parsing Twice
+
+Shaving another 3s off the run time, now at 65s, by not parsing the temperature data twice.
+
+Turing this:
+
+```go
+newLineIdx := bytes.IndexByte(content[idx+semiColonIdx:], '\n')
+
+for tmpIdx := idx + semiColonIdx + 1; tmpIdx < idx+semiColonIdx+newLineIdx; {
+  currByte := content[tmpIdx]
+  if currByte == '-' {
+    negate = -1
+  } else if currByte != '.' {
+    intVal := currByte - '0'
+    temperature = temperature*10 + int(intVal)
+  }
+  tmpIdx++
+}
+```
+
+into this:
+
+```go
+tmpIdx := idx + semiColonIdx + 1
+newLineIdx := 0
+Loop:
+for tmpIdx < len(content) {
+ currByte := content[tmpIdx]
+ tmpIdx++
+ newLineIdx++
+ switch currByte {
+ case '-':
+   negate = -1
+ case '\n':
+   break Loop
+ case '.':
+   continue
+ default:
+   intVal := currByte - '0'
+   temperature = temperature*10 + int(intVal)
+ }
+}
+```
+
+Btw. using `else if`s instead of the `switch` is minimally slower (500ms).
+
+```shell
+hyperfine -r 5 -w 1 './go_single_thread_arrays_single_parse measurements.txt > solution.txt'
+Benchmark 1: ./go_single_thread_arrays_single_parse measurements.txt > solution.txt
+  Time (mean ± σ):     64.953 s ±  0.535 s    [User: 60.135 s, System: 2.173 s]
+  Range (min … max):   64.441 s … 65.843 s    5 runs
 ```
 
 ### Comparison
@@ -261,17 +426,21 @@ For details see [Benchmarks](#benchmarks)
 - `Go Ben Hoyt`: does not produce the correct output, fastest version of [The One Billion Row Challenge in Go: from 1m45s to 4s in nine solutions](https://benhoyt.com/writings/go-1brc/).
 - [./go_single_thread.go](./go_single_thread.go): my baseline Go version, single threaded and using a map of structures.
 - [./go_single_thread_arrays.go](./go_single_thread_arrays.go): my baseline Go version, single threaded and using an array of structures.
+- [./go_single_thread_arrays_64bit_ints.go](./go_single_thread_arrays_64bit_ints.go) the same as above, but using 64 bit integers to hold all temperature data (minimum and maximum values too).
+- [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
 
-| Program                       | Time |
-| ----------------------------- | ---- |
-| wc -l                         | 17s  |
-| awk.awk                       | 600s |
-| Java Reference Implementation | 220s |
-| Go Alexander Yastrebov        | 4s   |
-| Go Shraddha Agrawal           | 12s  |
-| Go Ben Hoyt*                  | 75s  |
-| go_single_thread.go           | 98s  |
-| go_single_thread_arrays.go    | 71s  |
+| Program                                 | Time |
+| --------------------------------------- | ---- |
+| wc -l                                   | 17s  |
+| awk.awk                                 | 600s |
+| Java Reference Implementation           | 220s |
+| Go Alexander Yastrebov                  | 4s   |
+| Go Shraddha Agrawal                     | 12s  |
+| Go Ben Hoyt*                            | 75s  |
+| go_single_thread.go                     | 98s  |
+| go_single_thread_arrays.go              | 71s  |
+| go_single_thread_arrays_64bit_ints.go   | 68s  |
+| go_single_thread_arrays_single_parse.go | 65s  |
 
 ## Files
 
@@ -279,6 +448,9 @@ This is a description of the files in this repository and the generated files, w
 
 - [./awk.awk](./awk.awk): straightforward GNU AWK implementation, to get a baseline time. Needs GNU awk, `gawk` to run, POSIX `awk` is not supported because of the sorting function it uses.
 - [./go_single_thread.go](./go_single_thread.go): the baseline go version, single threaded and using a map of structures.
+- [./go_single_thread_arrays.go](./go_single_thread_arrays.go): first iteration, changing the map of structures to a map of indices into an structure of arrays.
+- [./go_single_thread_arrays_64bit_ints.go](./go_single_thread_arrays_64bit_ints.go): the same as above, but using `int` or `uint` - 64 bit integers - for all arrays holding temperature data, instead of the minimal needed 16 or 32 bit integers.
+- [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
 
 ### Data and Java Reference Implementation
 

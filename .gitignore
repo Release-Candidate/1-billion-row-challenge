@@ -4,7 +4,11 @@ correct_results*.txt
 # actual solution
 solution*.txt
 
+# profiling data
+cpu.prof
+
 # generated binaries
 go_single_thread
 go_single_thread_arrays
-cpu.prof
+go_single_thread_arrays_64bit_ints
+go_single_thread_arrays_single_parse
