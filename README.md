@@ -86,6 +86,19 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
    diff correct_results.txt ./solution.txt
    ```
 
+5. Compile and benchmark the single threaded Go version using arrays:
+
+    ```shell
+    go build ./go_single_thread_arrays.go
+    hyperfine -r 5 -w 1 './go_single_thread_arrays measurements.txt > solution.txt'
+    ```
+
+6. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
 ## Other Solutions
 
 Official Java implementations: [1BRC - Results](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#results)
@@ -115,6 +128,15 @@ hyperfine -r 5 -w 1 './go_single_thread measurements_big.txt > solution_big.txt'
 Benchmark 1: ./go_single_thread measurements_big.txt > solution_big.txt
   Time (mean ± σ):     98.484 s ±  1.296 s    [User: 90.378 s, System: 3.329 s]
   Range (min … max):   96.970 s … 100.237 s    5 runs
+```
+
+Benchmark of [./go_single_thread_arrays.go](./go_single_thread_arrays.go): 71s, 27s less than `./go_single_thread`.
+
+```shell
+hyperfine -r 5 -w 1 './go_single_thread_arrays measurements.txt > solution.txt'
+Benchmark 1: ./go_single_thread_arrays measurements.txt > solution.txt
+  Time (mean ± σ):     70.707 s ±  0.282 s    [User: 66.361 s, System: 1.657 s]
+  Range (min … max):   70.288 s … 71.007 s    5 runs
 ```
 
 ### Comparison
@@ -238,6 +260,7 @@ For details see [Benchmarks](#benchmarks)
 - `Go Shraddha Agrawal`: fasted Version of [One Billion Rows Challenge in Golang](https://www.bytesizego.com/blog/one-billion-row-challenge-go)
 - `Go Ben Hoyt`: does not produce the correct output, fastest version of [The One Billion Row Challenge in Go: from 1m45s to 4s in nine solutions](https://benhoyt.com/writings/go-1brc/).
 - [./go_single_thread.go](./go_single_thread.go): my baseline Go version, single threaded and using a map of structures.
+- [./go_single_thread_arrays.go](./go_single_thread_arrays.go): my baseline Go version, single threaded and using an array of structures.
 
 | Program                       | Time |
 | ----------------------------- | ---- |
@@ -248,6 +271,7 @@ For details see [Benchmarks](#benchmarks)
 | Go Shraddha Agrawal           | 12s  |
 | Go Ben Hoyt*                  | 75s  |
 | go_single_thread.go           | 98s  |
+| go_single_thread_arrays.go    | 71s  |
 
 ## Files
 

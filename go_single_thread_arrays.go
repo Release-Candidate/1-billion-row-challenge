@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: MIT
 //
 // Project:  1-billion-row-challenge
-// File:     go_single_thread.go
+// File:     go_single_thread_arrays.go
 // Date:     04.Mar.2024
 //
-// ==============================================================================
+// =============================================================================
 
 package main
 
@@ -16,11 +16,11 @@ import (
 	"sort"
 )
 
-type stationTemperature struct {
-	TempSum int32
-	Count   uint32
-	Min     int16
-	Max     int16
+type stationTemperatures struct {
+	TempSum []int32
+	Count   []uint32
+	Min     []int16
+	Max     []int16
 }
 
 func main() {
@@ -35,12 +35,21 @@ func main() {
 		os.Exit(2)
 	}
 
-	stationData := make(map[string]stationTemperature, 10_000)
+	stationData := stationTemperatures{
+		TempSum: make([]int32, 10_000),
+		Count:   make([]uint32, 10_000),
+		Min:     make([]int16, 10_000),
+		Max:     make([]int16, 10_000),
+	}
+
+	stationIdxMap := make(map[string]int, 10_000)
+	stationIdx := 0
 	idx := 0
 	// We suppose the file is valid, without a single error.
 	// Not a single error check is made.
 	for idx < len(content) {
 		semiColonIdx := bytes.IndexByte(content[idx:], ';')
+		// End of file.
 		if semiColonIdx < 0 {
 			break
 		}
@@ -64,27 +73,26 @@ func main() {
 		}
 		temperature *= negate
 
-		currData, ok := stationData[string(station)]
+		stIdx, ok := stationIdxMap[string(station)]
 		if ok {
-			currData.TempSum += int32(temperature)
-			currData.Count++
-			currData.Min = min(currData.Min, temperature)
-			currData.Max = max(currData.Max, temperature)
-			stationData[string(station)] = currData
+			stationData.TempSum[stIdx] += int32(temperature)
+			stationData.Count[stIdx]++
+			stationData.Min[stIdx] = min(stationData.Min[stIdx], temperature)
+			stationData.Max[stIdx] = max(stationData.Max[stIdx], temperature)
 		} else {
-			stationData[string(station)] = stationTemperature{
-				TempSum: int32(temperature),
-				Count:   1,
-				Min:     temperature,
-				Max:     temperature,
-			}
+			stationIdxMap[string(station)] = stationIdx
+			stationData.TempSum[stationIdx] += int32(temperature)
+			stationData.Count[stationIdx]++
+			stationData.Min[stationIdx] = temperature
+			stationData.Max[stationIdx] = temperature
+			stationIdx++
 		}
 
 		idx += semiColonIdx + newLineIdx + 1
 	}
 
 	keys := make([]string, 0, 10_000)
-	for key := range stationData {
+	for key := range stationIdxMap {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
@@ -94,12 +102,13 @@ func main() {
 		if i > 0 {
 			fmt.Printf(", ")
 		}
-		meanF := float64(stationData[station].TempSum) / float64(stationData[station].Count*10)
+		idx := stationIdxMap[station]
+		meanF := float64(stationData.TempSum[idx]) / float64(stationData.Count[idx]*10)
 		mean := fmt.Sprintf("%.1f", meanF)
 		if mean == "-0.0" {
 			mean = "0.0"
 		}
-		fmt.Printf("%s=%.1f/%s/%.1f", station, float32(stationData[station].Min)*0.1, mean, float32(stationData[station].Max)*0.1)
+		fmt.Printf("%s=%.1f/%s/%.1f", station, float32(stationData.Min[idx])*0.1, mean, float32(stationData.Max[idx])*0.1)
 	}
 	fmt.Printf("}\n")
 }

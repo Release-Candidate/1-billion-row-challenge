@@ -6,3 +6,5 @@ solution*.txt
 
 # generated binaries
 go_single_thread
+go_single_thread_arrays
+cpu.prof
