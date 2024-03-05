@@ -2,6 +2,8 @@
 
 This is my take on the one billion row challenge: [gunnarmorling/1brc at Github](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#rules-and-limits)
 
+The results as a table: [Results](#results)
+
 - [Relevant Rules and Properties of the Data](#relevant-rules-and-properties-of-the-data)
   - [The Task](#the-task)
   - [Properties We Can Use to Our Advantage](#properties-we-can-use-to-our-advantage)
@@ -13,6 +15,10 @@ This is my take on the one billion row challenge: [gunnarmorling/1brc at Github]
   - [Integer Sizes of the Temperature Arrays](#integer-sizes-of-the-temperature-arrays)
   - [Not Searching for the Newline Character, Not Parsing Twice](#not-searching-for-the-newline-character-not-parsing-twice)
   - [Not Searching for the Semicolon, Not Parsing the Station Name Twice](#not-searching-for-the-semicolon-not-parsing-the-station-name-twice)
+  - [Profiling](#profiling)
+    - [parseStationName](#parsestationname)
+    - [parseTemperature](#parsetemperature)
+    - [addTemperatureData](#addtemperaturedata)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -352,6 +358,135 @@ hyperfine -r 5 -w 1 './go_single_thread_single_parse_II measurements.txt > solut
 Benchmark 1: ./go_single_thread_single_parse_II measurements.txt > solution.txt
   Time (mean ± σ):     55.935 s ±  0.415 s    [User: 50.707 s, System: 2.420 s]
   Range (min … max):   55.255 s … 56.388 s    5 runs
+```
+
+### Profiling
+
+Now is the time to profile the program to see, where the most time is spent.
+
+So we refactor everything out of the main loop, so that we got function names in the profile. And add the profiling stanza to write the data to the file `cpu.prof`.
+
+```go
+f, err := os.Create("cpu.prof")
+if err != nil {
+  log.Fatal(err)
+}
+pprof.StartCPUProfile(f)
+defer pprof.StopCPUProfile()
+```
+
+See file [./go_single_thread_profiling.go](./go_single_thread_profiling.go).
+
+Compiling and running this executable generates the profile file `cpu.prof`:
+
+```shell
+go build ./go_single_thread_profiling.go
+./go_single_thread_profiling measurements.txt > solution.txt
+go tool pprof ./go_single_thread_profiling cpu.prof
+```
+
+and then, in the `pprof` prompt, type:
+
+```text
+(pprof) web
+```
+
+Opens the following image in the browser:
+![Image of the profiling data](./images/profiling_1.png)
+
+| Function           | Time Spent |
+| ------------------ | ---------- |
+| parseStationName   | 20.10s     |
+| mapaccess2_faststr | 11.25s     |
+| parseTemperature   | 10.76s     |
+| addTemperatureData | 2.32s      |
+| readFile           | 1.22s      |
+
+So loading the data from file into a byte array takes 1.22 seconds, and the time to sort and print the results isn't even on this image.
+
+The most time is spent parsing the station name, then hash table lookups and writes and the third is the parsing of the temperatures.
+
+So, let's look at the details of each of these functions.
+
+#### parseStationName
+
+```text
+list parseStationName
+Total: 48.97s
+ROUTINE ======================== main.parseStationName in /Users/roland/Documents/code/1-billion-row-challenge/go_single_thread_profiling.go
+    20.10s     20.15s (flat, cum) 41.15% of Total
+         .          .     36:func parseStationName(content []byte, idx int) (int, []byte) {
+         .          .     37:   semiColonIdx := 0
+      60ms      100ms     38:   station := [100]byte{}
+     1.54s      1.54s     39:   currByte := content[idx]
+     140ms      140ms     40:   for currByte != ';' {
+     850ms      850ms     41:           station[semiColonIdx] = currByte
+         .          .     42:           semiColonIdx++
+    15.71s     15.72s     43:           currByte = content[idx+semiColonIdx]
+         .          .     44:   }
+     1.80s      1.80s     45:   return semiColonIdx, station[:semiColonIdx]
+         .          .     46:}
+         .          .     47:
+         .          .     48:func parseTemperature(idx int, semiColonIdx int, content []byte) (int, int) {
+         .          .     49:   var temperature int = 0
+         .          .     50:   var negate int = 1
+```
+
+#### parseTemperature
+
+```text
+(pprof) list parseTemperature
+Total: 48.97s
+ROUTINE ======================== main.parseTemperature in /Users/roland/Documents/code/1-billion-row-challenge/go_single_thread_profiling.go
+    10.76s     10.78s (flat, cum) 22.01% of Total
+         .          .     48:func parseTemperature(idx int, semiColonIdx int, content []byte) (int, int) {
+         .          .     49:   var temperature int = 0
+         .          .     50:   var negate int = 1
+         .          .     51:   tmpIdx := idx + semiColonIdx + 1
+         .          .     52:   newLineIdx := 0
+         .          .     53:Loop:
+      40ms       40ms     54:   for tmpIdx < len(content) {
+     8.57s      8.57s     55:           currByte := content[tmpIdx]
+     400ms      400ms     56:           tmpIdx++
+      10ms       10ms     57:           newLineIdx++
+         .          .     58:           switch currByte {
+     1.32s      1.33s     59:           case '-':
+         .          .     60:                   negate = -1
+         .          .     61:           case '\n':
+         .          .     62:                   break Loop
+     420ms      430ms     63:           case '.':
+         .          .     64:                   continue
+         .          .     65:           default:
+         .          .     66:                   intVal := currByte - '0'
+         .          .     67:                   temperature = temperature*10 + int(intVal)
+         .          .     68:           }
+```
+
+#### addTemperatureData
+
+```text
+(pprof) list addTemperatureData
+Total: 48.97s
+ROUTINE ======================== main.addTemperatureData in /Users/roland/Documents/code/1-billion-row-challenge/go_single_thread_profiling.go
+     2.32s     13.57s (flat, cum) 27.71% of Total
+     290ms      290ms     74:func addTemperatureData(stationIdxMap *map[string]int, station []byte, stationData *stationTemperatures, temperature int, stationIdx int) int {
+     140ms     11.39s     75:   stIdx, ok := (*stationIdxMap)[string(station)]
+     210ms      210ms     76:   if ok {
+        1s         1s     77:           stationData.TempSum[stIdx] += temperature
+     270ms      270ms     78:           stationData.Count[stIdx]++
+     170ms      170ms     79:           stationData.Min[stIdx] = min(stationData.Min[stIdx], temperature)
+     130ms      130ms     80:           stationData.Max[stIdx] = max(stationData.Max[stIdx], temperature)
+         .          .     81:   } else {
+         .          .     82:           (*stationIdxMap)[string(station)] = stationIdx
+         .          .     83:           stationData.TempSum[stationIdx] += temperature
+         .          .     84:           stationData.Count[stationIdx]++
+         .          .     85:           stationData.Min[stationIdx] = temperature
+         .          .     86:           stationData.Max[stationIdx] = temperature
+         .          .     87:           stationIdx++
+         .          .     88:   }
+         .          .     89:
+     110ms      110ms     90:   return stationIdx
+         .          .     91:}
 ```
 
 ### Comparison
