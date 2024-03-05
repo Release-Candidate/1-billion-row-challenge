@@ -12,3 +12,4 @@ go_single_thread
 go_single_thread_arrays
 go_single_thread_arrays_64bit_ints
 go_single_thread_arrays_single_parse
+go_single_thread_single_parse_II

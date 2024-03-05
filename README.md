@@ -12,6 +12,7 @@ This is my take on the one billion row challenge: [gunnarmorling/1brc at Github]
   - [Map of Records to Map of Indices into Arrays](#map-of-records-to-map-of-indices-into-arrays)
   - [Integer Sizes of the Temperature Arrays](#integer-sizes-of-the-temperature-arrays)
   - [Not Searching for the Newline Character, Not Parsing Twice](#not-searching-for-the-newline-character-not-parsing-twice)
+- [Not Searching for the Semicolon, Not Parsing the Station Name Twice](#not-searching-for-the-semicolon-not-parsing-the-station-name-twice)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -115,6 +116,19 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
    diff correct_results.txt ./solution.txt
    ```
 
+9. Compile and benchmark the single threaded Go version not searching for the semicolon, so only parsing the station name once:
+
+    ```shell
+    go build ./go_single_thread_single_parse_II.go
+   hyperfine -r 5 -w 1 './go_single_thread_single_parse_II measurements.txt > solution.txt'
+    ```
+
+10. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
 ## Other Solutions
 
 Official Java implementations: [1BRC - Results](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#results)
@@ -148,7 +162,7 @@ Benchmark 1: ./go_single_thread measurements_big.txt > solution_big.txt
 
 ### Map of Records to Map of Indices into Arrays
 
-Turing the naive hash map
+Turing the naive hash map of records
 
 ```go
 type stationTemperature struct {
@@ -304,6 +318,42 @@ Benchmark 1: ./go_single_thread_arrays_single_parse measurements.txt > solution.
   Range (min … max):   64.441 s … 65.843 s    5 runs
 ```
 
+## Not Searching for the Semicolon, Not Parsing the Station Name Twice
+
+Another 9s off by not parsing the station name twice, by not searching for the semicolon first. Now we are at 56s.
+
+Changing:
+
+```go
+semiColonIdx := bytes.IndexByte(content[idx:], ';')
+// End of file.
+if semiColonIdx < 0 {
+  break
+}
+station := content[idx : idx+semiColonIdx]
+```
+
+to:
+
+```go
+semiColonIdx := 0
+station := [100]byte{}
+currByte := content[idx]
+for currByte != ';' {
+  station[semiColonIdx] = currByte
+  semiColonIdx++
+  currByte = content[idx+semiColonIdx]
+}
+// and using `station[:semiColonIdx]` instead of `station`.
+```
+
+```shell
+hyperfine -r 5 -w 1 './go_single_thread_single_parse_II measurements.txt > solution.txt'
+Benchmark 1: ./go_single_thread_single_parse_II measurements.txt > solution.txt
+  Time (mean ± σ):     55.935 s ±  0.415 s    [User: 50.707 s, System: 2.420 s]
+  Range (min … max):   55.255 s … 56.388 s    5 runs
+```
+
 ### Comparison
 
 #### wc
@@ -428,6 +478,7 @@ For details see [Benchmarks](#benchmarks)
 - [./go_single_thread_arrays.go](./go_single_thread_arrays.go): my baseline Go version, single threaded and using an array of structures.
 - [./go_single_thread_arrays_64bit_ints.go](./go_single_thread_arrays_64bit_ints.go) the same as above, but using 64 bit integers to hold all temperature data (minimum and maximum values too).
 - [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
+- [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
 
 | Program                                 | Time |
 | --------------------------------------- | ---- |
@@ -441,6 +492,7 @@ For details see [Benchmarks](#benchmarks)
 | go_single_thread_arrays.go              | 71s  |
 | go_single_thread_arrays_64bit_ints.go   | 68s  |
 | go_single_thread_arrays_single_parse.go | 65s  |
+| go_single_thread_single_parse_II.go     | 56s  |
 
 ## Files
 
@@ -451,6 +503,7 @@ This is a description of the files in this repository and the generated files, w
 - [./go_single_thread_arrays.go](./go_single_thread_arrays.go): first iteration, changing the map of structures to a map of indices into an structure of arrays.
 - [./go_single_thread_arrays_64bit_ints.go](./go_single_thread_arrays_64bit_ints.go): the same as above, but using `int` or `uint` - 64 bit integers - for all arrays holding temperature data, instead of the minimal needed 16 or 32 bit integers.
 - [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
+- [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
 
 ### Data and Java Reference Implementation
 
