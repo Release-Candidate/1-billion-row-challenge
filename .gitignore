@@ -15,3 +15,4 @@ go_single_thread_arrays_single_parse
 go_single_thread_single_parse_II
 go_single_thread_profiling
 go_single_thread_parsing
+go_single_thread_variables

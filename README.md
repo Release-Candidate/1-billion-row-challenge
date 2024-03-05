@@ -20,6 +20,7 @@ The results as a table: [Results](#results)
     - [parseTemperature](#parsetemperature)
     - [addTemperatureData](#addtemperaturedata)
   - [Change the Parsing of the Station Name and Temperature](#change-the-parsing-of-the-station-name-and-temperature)
+  - [Moving all Variable Declarations out of the Inner Loop](#moving-all-variable-declarations-out-of-the-inner-loop)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -144,6 +145,19 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
     ```
 
 12. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
+13. Compile and benchmark the single threaded Go version with no variable declarations in the inner loop:
+
+    ```shell
+    go build ./go_single_thread_variables.go
+    hyperfine -r 5 -w 1 './go_single_thread_variables measurements.txt > solution.txt'
+    ```
+
+14. Compare the generated output file with the "official" output file:
 
    ```shell
    diff correct_results.txt ./solution.txt
@@ -596,6 +610,51 @@ Benchmark 1: ./go_single_thread_parsing measurements.txt > solution.txt
   Range (min … max):   51.702 s … 52.176 s    5 runs
 ```
 
+### Moving all Variable Declarations out of the Inner Loop
+
+By moving all variable declarations out of the inner loop, we can reduce the run time by another second, so it is now 51s.
+
+From
+
+```go
+for len(content) > 0 {
+  station := [100]byte{}
+  semiColonIdx := 1
+  currByte := content[1]
+    ...
+  var temperature int = 0
+  var negate = false
+  ...
+  stIdx, ok := stationIdxMap[string(station[:semiColonIdx])]
+  ...
+}
+```
+
+to
+
+```go
+station := [100]byte{}
+semiColonIdx := 1
+var temperature int = 0
+var negate = false
+var currByte byte = 0
+var ok bool = false
+var stIdx int = 0
+// We suppose the file is valid, without a single error.
+// Not a single error check is made.
+for len(content) > 0 {
+   semiColonIdx = 1
+   ...
+}
+```
+
+```shell
+hyperfine -r 5 -w 1 './go_single_thread_variables measurements.txt > solution.txt'
+Benchmark 1: ./go_single_thread_variables measurements.txt > solution.txt
+  Time (mean ± σ):     50.659 s ±  0.071 s    [User: 46.738 s, System: 1.597 s]
+  Range (min … max):   50.566 s … 50.762 s    5 runs
+```
+
 ### Comparison
 
 #### wc
@@ -722,6 +781,7 @@ For details see [Benchmarks](#benchmarks)
 - [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
 - [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
 - [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
+- [./go_single_thread_variables.go](./go_single_thread_variables.go): same as above, moved all variable declarations out of inner loop.
 
 | Program                                 | Time |
 | --------------------------------------- | ---- |
@@ -737,6 +797,7 @@ For details see [Benchmarks](#benchmarks)
 | go_single_thread_arrays_single_parse.go | 65s  |
 | go_single_thread_single_parse_II.go     | 56s  |
 | go_single_thread_parsing.go             | 52s  |
+| go_single_thread_variables.go           | 51s  |
 
 ## Files
 
@@ -749,6 +810,7 @@ This is a description of the files in this repository and the generated files, w
 - [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
 - [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
 - [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
+- [./go_single_thread_variables.go](./go_single_thread_variables.go): same as above, moved all variable declarations out of inner loop.
 
 ### Data and Java Reference Implementation
 
