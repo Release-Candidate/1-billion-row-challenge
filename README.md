@@ -19,6 +19,7 @@ The results as a table: [Results](#results)
     - [parseStationName](#parsestationname)
     - [parseTemperature](#parsetemperature)
     - [addTemperatureData](#addtemperaturedata)
+  - [Change the Parsing of the Station Name and Temperature](#change-the-parsing-of-the-station-name-and-temperature)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -126,10 +127,23 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
 
     ```shell
     go build ./go_single_thread_single_parse_II.go
-   hyperfine -r 5 -w 1 './go_single_thread_single_parse_II measurements.txt > solution.txt'
+    hyperfine -r 5 -w 1 './go_single_thread_single_parse_II measurements.txt > solution.txt'
     ```
 
 10. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
+11. Compile and benchmark the single threaded Go version not searching for the semicolon, so only parsing the station name once:
+
+    ```shell
+    go build ./go_single_thread_parsing.go
+    hyperfine -r 5 -w 1 './go_single_thread_parsing measurements.txt > solution.txt'
+    ```
+
+12. Compare the generated output file with the "official" output file:
 
    ```shell
    diff correct_results.txt ./solution.txt
@@ -394,6 +408,14 @@ and then, in the `pprof` prompt, type:
 Opens the following image in the browser:
 ![Image of the profiling data](./images/profiling_1.png)
 
+Or you can start a pprof web-server at localhost with port 8080 by using
+
+```shell
+go build ./go_single_thread_profiling.go
+./go_single_thread_profiling measurements.txt > solution.txt
+go tool pprof -http=localhost:8080 ./go_single_thread_profiling cpu.prof
+```
+
 | Function           | Time Spent |
 | ------------------ | ---------- |
 | parseStationName   | 20.10s     |
@@ -487,6 +509,91 @@ ROUTINE ======================== main.addTemperatureData in /Users/roland/Docume
          .          .     89:
      110ms      110ms     90:   return stationIdx
          .          .     91:}
+```
+
+### Change the Parsing of the Station Name and Temperature
+
+Another 4s less - now at 52s - by changing the parsing from:
+
+```go
+for idx < len(content) {
+  semiColonIdx := 0
+  station := [100]byte{}
+  currByte := content[idx]
+  for currByte != ';' {
+    station[semiColonIdx] = currByte
+    semiColonIdx++
+    currByte = content[idx+semiColonIdx]
+  }
+  var temperature int = 0
+  var negate int = 1
+  tmpIdx := idx + semiColonIdx + 1
+  newLineIdx := 0
+ Loop:
+  for tmpIdx < len(content) {
+    currByte = content[tmpIdx]
+    tmpIdx++
+    newLineIdx++
+    switch currByte {
+    case '-':
+      negate = -1
+    case '\n':
+      break Loop
+    case '.':
+      continue
+    default:
+      intVal := currByte - '0'
+      temperature = temperature*10 + int(intVal)
+   }
+  }
+  temperature *= negate
+    ...
+  idx += semiColonIdx + newLineIdx + 1
+}
+```
+
+to
+
+```go
+for len(content) > 0 {
+  station := [100]byte{}
+  // Station name is not empty.
+  semiColonIdx := 1
+  station[0] = content[0]
+  currByte := content[1]
+  for currByte != ';' {
+   station[semiColonIdx] = currByte
+   semiColonIdx++
+   currByte = content[semiColonIdx]
+  }
+  var temperature int = 0
+  var negate = false
+  if content[semiColonIdx+1] == '-' {
+    negate = true
+    content = content[semiColonIdx+2:]
+  } else {
+    content = content[semiColonIdx+1:]
+  }
+  // Either `N.N\n` or `NN.N\n`
+  if content[1] == '.' {
+    temperature = int(content[0])*10 + int(content[2]) - '0'*11
+    content = content[4:]
+  } else {
+    temperature = int(content[0])*100 + int(content[1])*10 + int(content[3]) - '0'*111
+    content = content[5:]
+  }
+  if negate {
+    temperature *= -1
+  }
+    ...
+}
+```
+
+```shell
+hyperfine -r 5 -w 1 './go_single_thread_parsing measurements.txt > solution.txt'
+Benchmark 1: ./go_single_thread_parsing measurements.txt > solution.txt
+  Time (mean ± σ):     51.951 s ±  0.223 s    [User: 47.165 s, System: 1.911 s]
+  Range (min … max):   51.702 s … 52.176 s    5 runs
 ```
 
 ### Comparison
@@ -614,6 +721,7 @@ For details see [Benchmarks](#benchmarks)
 - [./go_single_thread_arrays_64bit_ints.go](./go_single_thread_arrays_64bit_ints.go) the same as above, but using 64 bit integers to hold all temperature data (minimum and maximum values too).
 - [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
 - [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
+- [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
 
 | Program                                 | Time |
 | --------------------------------------- | ---- |
@@ -628,6 +736,7 @@ For details see [Benchmarks](#benchmarks)
 | go_single_thread_arrays_64bit_ints.go   | 68s  |
 | go_single_thread_arrays_single_parse.go | 65s  |
 | go_single_thread_single_parse_II.go     | 56s  |
+| go_single_thread_parsing.go             | 52s  |
 
 ## Files
 
@@ -639,6 +748,7 @@ This is a description of the files in this repository and the generated files, w
 - [./go_single_thread_arrays_64bit_ints.go](./go_single_thread_arrays_64bit_ints.go): the same as above, but using `int` or `uint` - 64 bit integers - for all arrays holding temperature data, instead of the minimal needed 16 or 32 bit integers.
 - [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
 - [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
+- [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
 
 ### Data and Java Reference Implementation
 
