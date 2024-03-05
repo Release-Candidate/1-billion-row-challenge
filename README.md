@@ -12,7 +12,7 @@ This is my take on the one billion row challenge: [gunnarmorling/1brc at Github]
   - [Map of Records to Map of Indices into Arrays](#map-of-records-to-map-of-indices-into-arrays)
   - [Integer Sizes of the Temperature Arrays](#integer-sizes-of-the-temperature-arrays)
   - [Not Searching for the Newline Character, Not Parsing Twice](#not-searching-for-the-newline-character-not-parsing-twice)
-- [Not Searching for the Semicolon, Not Parsing the Station Name Twice](#not-searching-for-the-semicolon-not-parsing-the-station-name-twice)
+  - [Not Searching for the Semicolon, Not Parsing the Station Name Twice](#not-searching-for-the-semicolon-not-parsing-the-station-name-twice)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -318,7 +318,7 @@ Benchmark 1: ./go_single_thread_arrays_single_parse measurements.txt > solution.
   Range (min … max):   64.441 s … 65.843 s    5 runs
 ```
 
-## Not Searching for the Semicolon, Not Parsing the Station Name Twice
+### Not Searching for the Semicolon, Not Parsing the Station Name Twice
 
 Another 9s off by not parsing the station name twice, by not searching for the semicolon first. Now we are at 56s.
 
