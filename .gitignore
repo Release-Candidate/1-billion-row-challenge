@@ -21,3 +21,4 @@ go_single_thread_parsing
 go_single_thread_variables
 go_parallel_preparation
 go_parallel
+go_parallel_thread_factor

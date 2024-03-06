@@ -24,6 +24,7 @@ The results as a table: [Results](#results)
   - [Interlude: Changing the Rounding of the Output](#interlude-changing-the-rounding-of-the-output)
   - [Parallelization - Preparation](#parallelization---preparation)
   - [Parallel Version](#parallel-version)
+  - [Parallel Version - Easy Gains](#parallel-version---easy-gains)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -161,6 +162,32 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
     ```
 
 14. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
+15. Compile and benchmark the parallel Go version:
+
+    ```shell
+    go build ./go_parallel.go
+    hyperfine -r 5 -w 1 './go_parallel measurements.txt > solution.txt'
+    ```
+
+16. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
+17. Compile and benchmark the parallel Go version with double the number of threads:
+
+    ```shell
+    go build ./go_parallel_thread_factor.go
+    hyperfine -r 5 -w 1 './go_parallel_thread_factor measurements.txt > solution.txt'
+    ```
+
+18. Compare the generated output file with the "official" output file:
 
    ```shell
    diff correct_results.txt ./solution.txt
@@ -743,6 +770,31 @@ Benchmark 1: ./go_parallel measurements.txt > solution.txt
   Range (min … max):    9.945 s … 10.870 s    5 runs
 ```
 
+### Parallel Version - Easy Gains
+
+By doubling the number of threads (on my computer), the runtime is now at 8s, -2s, 25% less.
+
+Changing
+
+```go
+numCPUs := runtime.NumCPU()
+```
+
+to
+
+```go
+numCPUs := 2 * runtime.NumCPU()
+```
+
+shaves off 2 seconds. Maybe I should have set the factor to 10 ;)
+
+```shell
+hyperfine -r 5 -w 1 './go_parallel_thread_factor measurements.txt > solution.txt'
+Benchmark 1: ./go_parallel_thread_factor measurements.txt > solution.txt
+  Time (mean ± σ):      7.845 s ±  0.228 s    [User: 56.062 s, System: 6.805 s]
+  Range (min … max):    7.477 s …  8.068 s    5 runs
+```
+
 ### Comparison
 
 #### wc
@@ -871,6 +923,7 @@ For details see [Benchmarks](#benchmarks)
 - [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
 - [./go_parallel_preparation.go](./go_parallel_preparation.go): same as above, the file is read and processed in "number of cores" chunks and summed together.
 - [./go_parallel.go](./go_parallel.go): the same as above, but using "num cores" threads to process the data.
+- [./go_parallel_thread_factor.go](./go_parallel_thread_factor.go): the same as above, but using 2 * "num cores" to process the data.
 
 | Program                                 | Time |
 | --------------------------------------- | ---- |
@@ -888,6 +941,7 @@ For details see [Benchmarks](#benchmarks)
 | go_single_thread_parsing.go             | 52s  |
 | go_parallel_preparation.go              | 49s  |
 | go_parallel.go                          | 10s  |
+| go_parallel_thread_factor.go            | 8s   |
 
 ## Files
 
@@ -902,6 +956,7 @@ This is a description of the files in this repository and the generated files, w
 - [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
 - [./go_parallel_preparation.go](./go_parallel_preparation.go): same as above, the file is read and processed in "number of cores" chunks and summed together.
 - [./go_parallel.go](./go_parallel.go): the same as above, but using "num cores" threads to process the data.
+- [](./go_parallel_thread_factor.go): the same as above, but using 2 * "num cores" to process the data.
 
 ### Data and Java Reference Implementation
 
