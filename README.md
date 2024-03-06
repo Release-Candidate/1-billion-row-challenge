@@ -25,6 +25,8 @@ The results as a table: [Results](#results)
   - [Parallelization - Preparation](#parallelization---preparation)
   - [Parallel Version](#parallel-version)
   - [Parallel Version - Easy Gains](#parallel-version---easy-gains)
+  - [Parallel Version - Parallel Summing](#parallel-version---parallel-summing)
+  - [Parallel Version - Tracing](#parallel-version---tracing)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -795,6 +797,67 @@ Benchmark 1: ./go_parallel_thread_factor measurements.txt > solution.txt
   Range (min … max):    7.477 s …  8.068 s    5 runs
 ```
 
+### Parallel Version - Parallel Summing
+
+Now we crank up the number of threads by setting the CPU-factor to 20 and use 2 threads to sum all results and then sum these two results in the main thread. This gives us about 400ms, so we are at 7.6s.
+
+```go
+numCPUs := 20 * runtime.NumCPU()
+...
+numSumChans := 2
+numToSum := numCPUs / numSumChans
+sumChannels := make([]chan resultType, numSumChans)
+
+for i := 0; i < numSumChans; i++ {
+  sumChannels[i] = make(chan resultType)
+
+  go sumResults(channels[i*numToSum:(i+1)*numToSum], sumChannels[i])
+}
+
+for _, channel := range sumChannels {
+  result := <-channel
+  stationData := result.Temps
+  stationIdxMap := result.IdxMap
+  ...
+}
+```
+
+```shell
+hyperfine -r 5 -w 1 './go_parallel_II measurements.txt > solution.txt'
+Benchmark 1: ./go_parallel_II measurements.txt > solution.txt
+  Time (mean ± σ):      7.652 s ±  0.111 s    [User: 57.599 s, System: 5.745 s]
+  Range (min … max):    7.536 s …  7.796 s    5 runs
+```
+
+### Parallel Version - Tracing
+
+At the end, we take a look at the trace of our go-routines. First, we have to enable trace output in the file:
+
+```go
+f, err := os.Create("trace.prof")
+if err != nil {
+  log.Fatal(err)
+}
+trace.Start(f)
+defer trace.Stop()
+```
+
+Then we run it like normal and view the trace result in a browser:
+
+```shell
+go build ./go_parallel_trace.go && hyperfine -r 5 -w 1 './go_parallel_trace measurements_big.txt > solution_big.txt'
+go tool trace trace.prof
+```
+
+When the browser displays the trace, select "View trace by proc".
+
+This is the overview of the whole process, from start to end. We see, that it takes some time to read the data file, and takes a bit of time to sum the results. Nut most of the time, all Cores are busy.
+![Image containing the trace of the whole runtime](./images/trace_overview.png)
+Here we see the start of the trace, that it takes about 700ms until enough threads have read their data and start working on it.
+![Image containing the start of the trace](./images/trace_start.png)
+At the end we see the 2 threads that do the first summing `main.sumResults` and the summing in the main thread and printing of the results. All together it takes about 100ms.
+![image containing the end of the trace](./images/trace_end.png)
+
 ### Comparison
 
 #### wc
@@ -924,6 +987,7 @@ For details see [Benchmarks](#benchmarks)
 - [./go_parallel_preparation.go](./go_parallel_preparation.go): same as above, the file is read and processed in "number of cores" chunks and summed together.
 - [./go_parallel.go](./go_parallel.go): the same as above, but using "num cores" threads to process the data.
 - [./go_parallel_thread_factor.go](./go_parallel_thread_factor.go): the same as above, but using 2 * "num cores" to process the data.
+- [./go_parallel_II.go](./go_parallel_II.go): same as above, but using 20 * "num cores" to process the data and 2 threads to sum the results.
 
 | Program                                 | Time |
 | --------------------------------------- | ---- |
@@ -942,6 +1006,7 @@ For details see [Benchmarks](#benchmarks)
 | go_parallel_preparation.go              | 49s  |
 | go_parallel.go                          | 10s  |
 | go_parallel_thread_factor.go            | 8s   |
+| go_parallel_II.go                       | 7.6s |
 
 ## Files
 
@@ -953,10 +1018,13 @@ This is a description of the files in this repository and the generated files, w
 - [./go_single_thread_arrays_64bit_ints.go](./go_single_thread_arrays_64bit_ints.go): the same as above, but using `int` or `uint` - 64 bit integers - for all arrays holding temperature data, instead of the minimal needed 16 or 32 bit integers.
 - [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
 - [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
+- [./go_single_thread_profiling.go](./go_single_thread_profiling.go): same as above, generates profiling info.
 - [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
 - [./go_parallel_preparation.go](./go_parallel_preparation.go): same as above, the file is read and processed in "number of cores" chunks and summed together.
 - [./go_parallel.go](./go_parallel.go): the same as above, but using "num cores" threads to process the data.
-- [](./go_parallel_thread_factor.go): the same as above, but using 2 * "num cores" to process the data.
+- [./go_parallel_thread_factor.go](./go_parallel_thread_factor.go): the same as above, but using 2 * "num cores" to process the data.
+- [./go_parallel_II.go](./go_parallel_II.go): same as above, but using 20 * "num cores" to process the data and 2 threads to sum the results.
+- [./go_parallel_trace.go](./go_parallel_trace.go): same as above, but with tracing enabled.
 
 ### Data and Java Reference Implementation
 

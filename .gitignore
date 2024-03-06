@@ -22,3 +22,5 @@ go_single_thread_variables
 go_parallel_preparation
 go_parallel
 go_parallel_thread_factor
+go_parallel_II
+trace.prof
