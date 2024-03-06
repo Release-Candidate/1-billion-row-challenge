@@ -851,7 +851,7 @@ go tool trace trace.prof
 
 When the browser displays the trace, select "View trace by proc".
 
-This is the overview of the whole process, from start to end. We see, that it takes some time to read the data file, and takes a bit of time to sum the results. Nut most of the time, all Cores are busy.
+This is the overview of the whole process, from start to end. We see, that it takes some time to read the data file, and takes a bit of time to sum the results. But most of the time, all cores are busy.
 ![Image containing the trace of the whole runtime](./images/trace_overview.png)
 Here we see the start of the trace, that it takes about 700ms until enough threads have read their data and start working on it.
 ![Image containing the start of the trace](./images/trace_start.png)
