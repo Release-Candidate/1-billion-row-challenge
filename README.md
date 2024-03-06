@@ -29,6 +29,7 @@ The results as a table: [Results](#results)
   - [Parallel Version - Easy Gains](#parallel-version---easy-gains)
   - [Parallel Version - Parallel Summing](#parallel-version---parallel-summing)
   - [Parallel Version - Tracing](#parallel-version---tracing)
+  - [Further Optimization](#further-optimization)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -846,7 +847,7 @@ Benchmark 1: ./go_parallel_II measurements.txt > solution.txt
 
 ### Parallel Version - Tracing
 
-At the end, we take a look at the trace of our go-routines. First, we have to enable trace output in the file:
+At the end, we take a look at the trace of our go-routines. First, we have to enable trace output in the file, to write the trace data to `trace.prof`:
 
 ```go
 f, err := os.Create("trace.prof")
@@ -857,7 +858,7 @@ trace.Start(f)
 defer trace.Stop()
 ```
 
-Then we run it like normal and view the trace result in a browser:
+Then we run it like normal and view the trace result in a browser using `go tool trace`:
 
 ```shell
 go build ./go_parallel_trace.go && hyperfine -r 5 -w 1 './go_parallel_trace measurements_big.txt > solution_big.txt'
@@ -872,6 +873,10 @@ Here we see the start of the trace, that it takes about 700ms until enough threa
 ![Image containing the start of the trace](./images/trace_start.png)
 At the end we see the 2 threads that do the first summing `main.sumResults` and the summing in the main thread and printing of the results. All together it takes about 100ms.
 ![image containing the end of the trace](./images/trace_end.png)
+
+### Further Optimization
+
+The most important would be to use another hash map, as most of the time is spent in the hash table lookups.
 
 ### Comparison
 
