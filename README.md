@@ -197,6 +197,19 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
    diff correct_results.txt ./solution.txt
    ```
 
+19. Compile and benchmark the parallel Go version with 20 times the number of threads and 2 summing threads:
+
+    ```shell
+    go build ./go_parallel_II.go
+    hyperfine -r 5 -w 1 './go_parallel_II measurements.txt > solution.txt'
+    ```
+
+20. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
 ## Other Solutions
 
 Official Java implementations: [1BRC - Results](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#results)
