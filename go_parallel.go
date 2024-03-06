@@ -89,15 +89,18 @@ func main() {
 	}
 	stationSumIdxMap := make(map[string]int, 10_000)
 
-	for _, chunk := range chunkList {
-		buffer := make([]byte, chunk.EndIdx-chunk.StartIdx+1)
-		_, err = file.ReadAt(buffer, chunk.StartIdx)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading data file at offset %d, len %d:\n%s\n",
-				chunk.StartIdx, chunk.EndIdx-chunk.StartIdx+1, err)
-			os.Exit(2)
-		}
-		stationData, stationIdxMap := processChunk(buffer)
+	channels := make([]chan resultType, numCPUs)
+
+	for idx, chunk := range chunkList {
+		// blocking channels
+		channels[idx] = make(chan resultType)
+		go processChunk(chunk, file, channels[idx])
+	}
+
+	for _, channel := range channels {
+		result := <-channel
+		stationData := result.Temps
+		stationIdxMap := result.IdxMap
 
 		stationIdx := 0
 		for station, idx := range stationIdxMap {
@@ -139,7 +142,20 @@ func main() {
 	fmt.Printf("}\n")
 }
 
-func processChunk(content []byte) (stationTemperatures, map[string]int) {
+type resultType struct {
+	Temps  stationTemperatures
+	IdxMap map[string]int
+}
+
+func processChunk(chunk chunk, file *os.File, channel chan resultType) {
+	content := make([]byte, chunk.EndIdx-chunk.StartIdx+1)
+	_, err := file.ReadAt(content, chunk.StartIdx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading data file at offset %d, len %d:\n%s\n",
+			chunk.StartIdx, chunk.EndIdx-chunk.StartIdx+1, err)
+		os.Exit(2)
+	}
+
 	stationData := stationTemperatures{
 		TempSum: make([]int, 10_000),
 		Count:   make([]uint, 10_000),
@@ -200,7 +216,7 @@ func processChunk(content []byte) (stationTemperatures, map[string]int) {
 			stationIdx++
 		}
 	}
-	return stationData, stationIdxMap
+	channel <- resultType{Temps: stationData, IdxMap: stationIdxMap}
 }
 
 func roundJava(x float64) float64 {

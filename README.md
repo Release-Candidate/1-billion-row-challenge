@@ -23,6 +23,7 @@ The results as a table: [Results](#results)
   - [Is not Faster: Moving all Variable Declarations out of the Inner Loop](#is-not-faster-moving-all-variable-declarations-out-of-the-inner-loop)
   - [Interlude: Changing the Rounding of the Output](#interlude-changing-the-rounding-of-the-output)
   - [Parallelization - Preparation](#parallelization---preparation)
+  - [Parallel Version](#parallel-version)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -731,6 +732,17 @@ Benchmark 1: ./go_parallel_preparation measurements.txt > solution.txt
   Range (min … max):   49.230 s … 49.396 s    5 runs
 ```
 
+### Parallel Version
+
+The first actual parallel version is much faster than the previous one, we now have a runtime of 10s, 1/5 of the previous and 1/10 of the initial version.
+
+```shell
+hyperfine -r 5 -w 1 './go_parallel measurements.txt > solution.txt'
+Benchmark 1: ./go_parallel measurements.txt > solution.txt
+  Time (mean ± σ):     10.285 s ±  0.349 s    [User: 53.966 s, System: 7.848 s]
+  Range (min … max):    9.945 s … 10.870 s    5 runs
+```
+
 ### Comparison
 
 #### wc
@@ -858,6 +870,7 @@ For details see [Benchmarks](#benchmarks)
 - [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
 - [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
 - [./go_parallel_preparation.go](./go_parallel_preparation.go): same as above, the file is read and processed in "number of cores" chunks and summed together.
+- [./go_parallel.go](./go_parallel.go): the same as above, but using "num cores" threads to process the data.
 
 | Program                                 | Time |
 | --------------------------------------- | ---- |
@@ -874,6 +887,7 @@ For details see [Benchmarks](#benchmarks)
 | go_single_thread_single_parse_II.go     | 56s  |
 | go_single_thread_parsing.go             | 52s  |
 | go_parallel_preparation.go              | 49s  |
+| go_parallel.go                          | 10s  |
 
 ## Files
 
@@ -887,6 +901,7 @@ This is a description of the files in this repository and the generated files, w
 - [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
 - [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
 - [./go_parallel_preparation.go](./go_parallel_preparation.go): same as above, the file is read and processed in "number of cores" chunks and summed together.
+- [./go_parallel.go](./go_parallel.go): the same as above, but using "num cores" threads to process the data.
 
 ### Data and Java Reference Implementation
 
