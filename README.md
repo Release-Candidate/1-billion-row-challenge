@@ -22,6 +22,7 @@ The results as a table: [Results](#results)
   - [Change the Parsing of the Station Name and Temperature](#change-the-parsing-of-the-station-name-and-temperature)
   - [Is not Faster: Moving all Variable Declarations out of the Inner Loop](#is-not-faster-moving-all-variable-declarations-out-of-the-inner-loop)
   - [Interlude: Changing the Rounding of the Output](#interlude-changing-the-rounding-of-the-output)
+  - [Parallelization - Preparation](#parallelization---preparation)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -146,6 +147,19 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
     ```
 
 12. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
+13. Compile and benchmark the single threaded Go version which chopped the data into chunks:
+
+    ```shell
+    go build ./go_parallel_preparation.go
+    hyperfine -r 5 -w 1 './go_parallel_preparation measurements.txt > solution.txt'
+    ```
+
+14. Compare the generated output file with the "official" output file:
 
    ```shell
    diff correct_results.txt ./solution.txt
@@ -669,6 +683,54 @@ func roundJava(x float64) float64 {
 }
 ```
 
+### Parallelization - Preparation
+
+If you may have wondered, if reading the whole file at once really is the fastest solution, then here is the answer: no, it isn't. We can do better.
+
+I just wanted to change the file reading at the first step of the parallelization. In this version we read and process the file in "number of Cores" chunks and sum the results together. This - without any parallelization - is 3s faster than the `go_single_thread_parsing.go` solution, so the last single threaded version takes 49s - we have exactly halved the time of the first version.
+
+The chunk calculation happens here:
+
+```go
+fsInfo, err := file.Stat()
+size := fsInfo.Size()
+chunkSize := size / int64(numCPUs)
+
+chunkList := make([]chunk, 0, numCPUs)
+chunkList = append(chunkList, chunk{
+  StartIdx: 0,
+  EndIdx:   size - 1,
+})
+
+var readOff int64 = chunkSize
+buffer := make([]byte, 150)
+for cpuIdx := 1; cpuIdx < numCPUs; cpuIdx++ {
+  _, err = file.ReadAt(buffer, readOff)
+  if err != nil {
+    fmt.Fprintf(os.Stderr, "Error reading file '%s' for chunking:\n%s\n", fileName, err)
+    os.Exit(4)
+  }
+  newlineIdx := bytes.IndexByte(buffer, '\n')
+  if newlineIdx < 0 {
+    chunkList[cpuIdx-1].EndIdx = size - 1
+    break
+  }
+  chunkList = append(chunkList, chunk{
+    StartIdx: readOff + int64(newlineIdx) + 1,
+    EndIdx:   size - 1,
+  })
+  chunkList[cpuIdx-1].EndIdx = readOff + int64(newlineIdx)
+  readOff += chunkSize
+}
+```
+
+```shell
+hyperfine -r 5 -w 1 './go_parallel_preparation measurements.txt > solution.txt'
+Benchmark 1: ./go_parallel_preparation measurements.txt > solution.txt
+  Time (mean ± σ):     49.293 s ±  0.066 s    [User: 47.507 s, System: 0.813 s]
+  Range (min … max):   49.230 s … 49.396 s    5 runs
+```
+
 ### Comparison
 
 #### wc
@@ -795,6 +857,7 @@ For details see [Benchmarks](#benchmarks)
 - [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
 - [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
 - [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
+- [./go_parallel_preparation.go](./go_parallel_preparation.go): same as above, the file is read and processed in "number of cores" chunks and summed together.
 
 | Program                                 | Time |
 | --------------------------------------- | ---- |
@@ -810,6 +873,7 @@ For details see [Benchmarks](#benchmarks)
 | go_single_thread_arrays_single_parse.go | 65s  |
 | go_single_thread_single_parse_II.go     | 56s  |
 | go_single_thread_parsing.go             | 52s  |
+| go_parallel_preparation.go              | 49s  |
 
 ## Files
 
@@ -822,7 +886,7 @@ This is a description of the files in this repository and the generated files, w
 - [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
 - [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
 - [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
-- [./go_single_thread_variables.go](./go_single_thread_variables.go): same as above, moved all variable declarations out of inner loop.
+- [./go_parallel_preparation.go](./go_parallel_preparation.go): same as above, the file is read and processed in "number of cores" chunks and summed together.
 
 ### Data and Java Reference Implementation
 
