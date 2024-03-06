@@ -12,6 +12,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"os"
 	"sort"
 )
@@ -94,12 +95,27 @@ func main() {
 		if i > 0 {
 			fmt.Printf(", ")
 		}
-		meanF := float64(stationData[station].TempSum) / float64(stationData[station].Count*10)
-		mean := fmt.Sprintf("%.1f", meanF)
-		if mean == "-0.0" {
-			mean = "0.0"
-		}
-		fmt.Printf("%s=%.1f/%s/%.1f", station, float32(stationData[station].Min)*0.1, mean, float32(stationData[station].Max)*0.1)
+		meanF := float64(stationData[station].TempSum) / float64(stationData[station].Count)
+		fmt.Printf("%s=%.1f/%0.1f/%.1f", station,
+			roundJava(float64(stationData[station].Min)),
+			roundJava(meanF),
+			roundJava(float64(stationData[station].Max)))
 	}
 	fmt.Printf("}\n")
+}
+
+func roundJava(x float64) float64 {
+	rounded := math.Trunc(x)
+	if x < 0.0 && rounded-x == 0.5 {
+		// return
+	} else if math.Abs(x-rounded) >= 0.5 {
+		rounded += math.Copysign(1, x)
+	}
+
+	// oh, another hardcoded `-0.0` to `0.0` conversion.
+	if rounded == 0 {
+		return 0.0
+	}
+
+	return rounded / 10.0
 }

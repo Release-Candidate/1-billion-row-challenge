@@ -7,6 +7,9 @@ solution*.txt
 # profiling data
 cpu.prof
 
+# local helper script
+run_all.sh
+
 # generated binaries
 go_single_thread
 go_single_thread_arrays

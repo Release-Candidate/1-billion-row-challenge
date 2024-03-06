@@ -20,7 +20,8 @@ The results as a table: [Results](#results)
     - [parseTemperature](#parsetemperature)
     - [addTemperatureData](#addtemperaturedata)
   - [Change the Parsing of the Station Name and Temperature](#change-the-parsing-of-the-station-name-and-temperature)
-  - [Moving all Variable Declarations out of the Inner Loop](#moving-all-variable-declarations-out-of-the-inner-loop)
+  - [Is not Faster: Moving all Variable Declarations out of the Inner Loop](#is-not-faster-moving-all-variable-declarations-out-of-the-inner-loop)
+  - [Interlude: Changing the Rounding of the Output](#interlude-changing-the-rounding-of-the-output)
   - [Comparison](#comparison)
     - [wc](#wc)
     - [Java Reference Implementation](#java-reference-implementation)
@@ -145,19 +146,6 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
     ```
 
 12. Compare the generated output file with the "official" output file:
-
-   ```shell
-   diff correct_results.txt ./solution.txt
-   ```
-
-13. Compile and benchmark the single threaded Go version with no variable declarations in the inner loop:
-
-    ```shell
-    go build ./go_single_thread_variables.go
-    hyperfine -r 5 -w 1 './go_single_thread_variables measurements.txt > solution.txt'
-    ```
-
-14. Compare the generated output file with the "official" output file:
 
    ```shell
    diff correct_results.txt ./solution.txt
@@ -610,7 +598,9 @@ Benchmark 1: ./go_single_thread_parsing measurements.txt > solution.txt
   Range (min … max):   51.702 s … 52.176 s    5 runs
 ```
 
-### Moving all Variable Declarations out of the Inner Loop
+### Is not Faster: Moving all Variable Declarations out of the Inner Loop
+
+**This is not faster than the previous solution**. Ii left this in here to show, that even if a benchmark tells us that a version is faster (by 1s, or 2%) we should **always** recheck such (relatively) small differences. Rerunning the benchmark 2 times shows, that this is actually slower than the previous version. Yes, other programs (or whatever) running on the same machine _do_ alter benchmark results, even by making them seemingly faster.
 
 By moving all variable declarations out of the inner loop, we can reduce the run time by another second, so it is now 51s.
 
@@ -653,6 +643,30 @@ hyperfine -r 5 -w 1 './go_single_thread_variables measurements.txt > solution.tx
 Benchmark 1: ./go_single_thread_variables measurements.txt > solution.txt
   Time (mean ± σ):     50.659 s ±  0.071 s    [User: 46.738 s, System: 1.597 s]
   Range (min … max):   50.566 s … 50.762 s    5 runs
+```
+
+### Interlude: Changing the Rounding of the Output
+
+So far the output isn't really rounded in the way the Java program does it, it has just been "faked" by hardcoding the output of `0.0` whenver a negative zero (`-0.0`) would have been printed. I've not invested much time and just used the solution used by Alexander Yastrebov in his solution [Function roundJava](https://github.com/gunnarmorling/1brc/blob/main/src/main/go/AlexanderYastrebov/calc.go#L242)
+
+I use this version, keep in mind that all values are multiplied by 10 and need to be divided by 10 to get the "real" value:
+
+```go
+func roundJava(x float64) float64 {
+  rounded := math.Trunc(x)
+  if x < 0.0 && rounded-x == 0.5 {
+    return rounded / 10.0
+  } else if math.Abs(x-t) >= 0.5 {
+    rounded += math.Copysign(1, x)
+  }
+
+  // oh, another hardcoded `-0.0` to `0.0` conversion.
+  if rounded == 0 {
+    return 0.0
+  }
+
+  return rounded / 10.0
+}
 ```
 
 ### Comparison
@@ -781,7 +795,6 @@ For details see [Benchmarks](#benchmarks)
 - [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go): the same as above, but do not search for the new line (`\n`) before parsing the temperature value.
 - [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go): same as above, but not searching for the semicolon and instead only parsing the station name once.
 - [./go_single_thread_parsing.go](./go_single_thread_parsing.go): same as above, changed the parsing of the station name and temperature value.
-- [./go_single_thread_variables.go](./go_single_thread_variables.go): same as above, moved all variable declarations out of inner loop.
 
 | Program                                 | Time |
 | --------------------------------------- | ---- |
@@ -797,7 +810,6 @@ For details see [Benchmarks](#benchmarks)
 | go_single_thread_arrays_single_parse.go | 65s  |
 | go_single_thread_single_parse_II.go     | 56s  |
 | go_single_thread_parsing.go             | 52s  |
-| go_single_thread_variables.go           | 51s  |
 
 ## Files
 
