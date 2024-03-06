@@ -799,7 +799,7 @@ Benchmark 1: ./go_parallel_thread_factor measurements.txt > solution.txt
 
 ### Parallel Version - Parallel Summing
 
-Now we crank up the number of threads by setting the CPU-factor to 20 and use 2 threads to sum all results and then sum these two results in the main thread. This gives us about 400ms, so we are at 7.6s.
+Now we crank up the number of threads by setting the CPU-factor to 20 and use 2 threads to sum all results and then sum these two results in the main thread. This gives us about 700ms, so we are at 7.3s.
 
 ```go
 numCPUs := 20 * runtime.NumCPU()
@@ -825,8 +825,8 @@ for _, channel := range sumChannels {
 ```shell
 hyperfine -r 5 -w 1 './go_parallel_II measurements.txt > solution.txt'
 Benchmark 1: ./go_parallel_II measurements.txt > solution.txt
-  Time (mean ± σ):      7.652 s ±  0.111 s    [User: 57.599 s, System: 5.745 s]
-  Range (min … max):    7.536 s …  7.796 s    5 runs
+  Time (mean ± σ):      7.337 s ±  0.106 s    [User: 57.618 s, System: 6.384 s]
+  Range (min … max):    7.179 s …  7.465 s    5 runs
 ```
 
 ### Parallel Version - Tracing
@@ -1006,7 +1006,7 @@ For details see [Benchmarks](#benchmarks)
 | go_parallel_preparation.go              | 49s  |
 | go_parallel.go                          | 10s  |
 | go_parallel_thread_factor.go            | 8s   |
-| go_parallel_II.go                       | 7.6s |
+| go_parallel_II.go                       | 7.3s |
 
 ## Files
 
