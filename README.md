@@ -2,7 +2,7 @@
 
 This is my take on the one billion row challenge: [gunnarmorling/1brc at Github](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#rules-and-limits)
 
-This is my journey from the first, single thread version that took 100s to run, to the last, multi-threaded version which takes about 7.3s.
+These are my steps from the first, single thread version that took 100s to run, to the last, multi-threaded version which takes about 7.3s.
 
 The results as a table: [Results](#results)
 
