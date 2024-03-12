@@ -69,6 +69,7 @@ func main() {
 	sumChannels := make([]chan resultType, numSumChans)
 
 	for i := 0; i < numSumChans; i++ {
+		// blocking channels
 		sumChannels[i] = make(chan resultType)
 
 		go sumResults(channels[i*numToSum:(i+1)*numToSum], sumChannels[i])
