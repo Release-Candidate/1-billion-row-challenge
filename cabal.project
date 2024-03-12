@@ -1,0 +1,9 @@
+packages: .
+
+with-compiler: ghc-9.6.4
+
+package *
+  coverage: False
+  library-coverage: False
+  haddock-executables: False
+  haddock-internal: False

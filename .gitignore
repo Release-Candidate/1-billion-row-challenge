@@ -10,6 +10,13 @@ cpu.prof
 # local helper script
 run_all.sh
 
+# MacOS specific
+.DS_Store
+
+# Haskell tmp directories
+exe/
+exe-bodi/
+
 # generated binaries
 go_single_thread
 go_single_thread_arrays
@@ -25,5 +32,6 @@ go_parallel_thread_factor
 go_parallel_II
 trace.prof
 go_parallel_III
-exe/dist-newstyle
-.DS_Store
+dist-newstyle/
+.stack-work/
+haskell_single_I

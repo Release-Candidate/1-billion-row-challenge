@@ -6,7 +6,7 @@ This is my take on the one billion row challenge: [gunnarmorling/1brc at Github]
 
 These are my steps from the [first, single thread Go version](./go_single_thread.go) that took 100s to run, to the [last, multi-threaded Go version](./go_parallel_III.go) which takes about 7.0s.
 
-And the evolution of the Haskell version, starting at 100s too - but this is already an optimized version, comparable to the fastest single threaded Go version.
+And the evolution of the Haskell version, starting at 100s too - but this is already an optimized version, comparable to the fastest single threaded Go version. The development of this version happened because and with ideas from this thread: [One Billion Row challenge in Hs](https://discourse.haskell.org/t/one-billion-row-challenge-in-hs/8946/108).
 
 The results as a table: [Results](#results)
 
@@ -38,6 +38,7 @@ The results as a table: [Results](#results)
   - [Parallel Version - More Easy Gains](#parallel-version---more-easy-gains)
   - [Further Optimization](#further-optimization)
 - [Haskell Benchmarks](#haskell-benchmarks)
+  - [Optimized Single Thread Version](#optimized-single-thread-version)
 - [Comparison](#comparison)
   - [wc](#wc)
   - [Java Reference Implementation](#java-reference-implementation)
@@ -84,7 +85,7 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
 
 - While 1 billion sounds like much, we can keep everything (the whole data file and the intermediate data) in 32GB RAM. So no need to think about memory. Which means that if you have less RAM, you should scale the number of rows accordingly (`500_000_000`, 500 millions if you've got 16GB, `250_000_000` if you've got 8GB, ...).
 - A maximum of 10,000 unique station names: so we can set all capacities to 10,000 and won't need to reallocate when dynamically growing. This implies, that there is a maximum number of 100,000 (1,000,000,000 / 10,000) temperatures per station.
-- All float values are in the inclusive interval `[-99.9, 99.9]` and have exactly (always!) one decimal digit. So if we parse these as integers, we get values in the interval `[-990, 990]`. Having a maximum of 100,000 temperature values implies that the sums of these integer values are (always) in `[-99 000 000, 99 000 000]`. This is a sub-interval of `[-2^27, 2^27] == [-134 217 728, 134 217 728]`, so 32 bit integers suffice to hold the sum of the temperature values.
+- All float values are in the inclusive interval `[-99.9, 99.9]` and have exactly (always!) one decimal digit. So if we parse these as integers, we get values in the interval `[-990, 990]`. Having a maximum of 1,000,000,000 temperature values implies that the sums of these integer values are (always) in `[-990 000 000 000, 990 000 000 000]`. This is a sub-interval of `[-2^40, 2^40] == [-1 099 511 627 776, 1 099 511 627 776]`, so 64 bit integers suffice to hold the sum of the temperature values.
 - The max length of 100 bytes of the names => we can use a fixed 100 byte buffer to parse them into.
 
 ## How to Run the Go Versions
@@ -234,6 +235,8 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
 
 ## How to Run the Haskell Versions
 
+The Haskell executables can either be build using Stack, like is documented here, or using Cabal, the project is set up to work with both.
+
 1. Generate the data file [./measurements.txt](./measurements.txt) by running the Python script [./create_measurements.py](./create_measurements.py) on the file [./weather_stations.csv](./weather_stations.csv):
 
    ```shell
@@ -250,8 +253,8 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
 3. Compile and benchmark the single threaded Haskell version using [hyperfine](https://github.com/sharkdp/hyperfine):
 
     ```shell
-    go build ./go_single_thread.go
-    hyperfine -r 5 -w 1 './go_single_thread measurements.txt > solution.txt'
+    stack install :haskell_single_I --local-bin-path ./
+    hyperfine -r 5 -w 1 './haskell_single_I measurements.txt > solution.txt'
     ```
 
 4. Compare the generated output file with the "official" output file:
@@ -1013,6 +1016,21 @@ Detailed specs:
 - 16-core Neural Engine
 - 400GB/s memory bandwidth
 
+The thread [One Billion Row challenge in Hs](https://discourse.haskell.org/t/one-billion-row-challenge-in-hs/8946/108) is the reason for the Haskell programs and a great source of ideas.
+
+### Optimized Single Thread Version
+
+The first Haskell version runs the benchmark in 98 seconds. This is equivalent to the optimized Go version [./go_single_thread_parsing.go](./go_single_thread_parsing.go), which has a runtime of 54s, so it is about twice as fast. This needs the same time as my baseline Go version, [go_single_thread.go](./go_single_thread.go).
+
+It reads the whole file at once, parses the station name and temperature of the current row, adds the station name in a hashmap together with an index into a record of 4 arrays, which contain the number of temperatures, the sum of temperatures, and the minimum and maximum temperature of each station idx.
+
+```shell
+hyperfine -r 5 -w 1 './haskell_single_I measurements.txt > solution.txt'
+Benchmark 1: ./haskell_single_I measurements.txt > solution.txt
+  Time (mean ± σ):     97.947 s ±  0.891 s    [User: 89.224 s, System: 17.112 s]
+  Range (min … max):   97.067 s … 99.148 s    5 runs
+```
+
 ## Comparison
 
 ### wc
@@ -1144,6 +1162,7 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 - [./go_parallel_thread_factor.go](./go_parallel_thread_factor.go): the same as above, but using 2 * "num cores" to process the data.
 - [./go_parallel_II.go](./go_parallel_II.go): same as above, but using 20 * "num cores" to process the data and 2 threads to sum the results.
 - [./go_parallel_III.go](./go_parallel_III.go): same as above, but moving the generation of the temporary name array out of the inner loop and using non-blocking channels.
+- [./haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs): the first single threaded Haskell version. Already optimized.
 
 | Program                                 | Time |
 | --------------------------------------- | ---- |
@@ -1153,6 +1172,7 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 | Go Alexander Yastrebov                  | 4s   |
 | Go Shraddha Agrawal                     | 12s  |
 | Go Ben Hoyt*                            | 75s  |
+| haskell_single_I                        | 98s  |
 | go_single_thread.go                     | 98s  |
 | go_single_thread_arrays.go              | 71s  |
 | go_single_thread_arrays_64bit_ints.go   | 68s  |
@@ -1183,6 +1203,7 @@ This is a description of the files in this repository and the generated files, w
 - [./go_parallel_II.go](./go_parallel_II.go): same as above, but using 20 * "num cores" to process the data and 2 threads to sum the results.
 - [./go_parallel_trace.go](./go_parallel_trace.go): same as above, but with tracing enabled.
 - [./go_parallel_III.go](./go_parallel_III.go): same as above, but moving the generation of the temporary name array out of the inner loop and using non-blocking channels.
+- [./haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs): the first single threaded Haskell version. Already optimized.
 
 ### Data and Java Reference Implementation
 
