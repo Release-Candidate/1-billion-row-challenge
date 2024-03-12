@@ -2,7 +2,7 @@
 
 This is my take on the one billion row challenge: [gunnarmorling/1brc at Github](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#rules-and-limits)
 
-These are my steps from the [first, single thread version](./go_single_thread.go) that took 100s to run, to the [last, multi-threaded version](./go_parallel_II.go) which takes about 7.3s.
+These are my steps from the [first, single thread version](./go_single_thread.go) that took 100s to run, to the [last, multi-threaded version](./go_parallel_III.go) which takes about 7.0s.
 
 The results as a table: [Results](#results)
 
@@ -29,6 +29,7 @@ The results as a table: [Results](#results)
   - [Parallel Version - Easy Gains](#parallel-version---easy-gains)
   - [Parallel Version - Parallel Summing](#parallel-version---parallel-summing)
   - [Parallel Version - Tracing](#parallel-version---tracing)
+  - [Parallel Version - More Easy Gains](#parallel-version---more-easy-gains)
   - [Further Optimization](#further-optimization)
   - [Comparison](#comparison)
     - [wc](#wc)
@@ -206,6 +207,19 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
     ```
 
 20. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
+21. Compile and benchmark the parallel Go version with non-blocking channels and a moved temporary array:
+
+    ```shell
+    go build ./go_parallel_III.go
+    hyperfine -r 5 -w 1 './go_parallel_III measurements.txt > solution.txt'
+    ```
+
+22. Compare the generated output file with the "official" output file:
 
    ```shell
    diff correct_results.txt ./solution.txt
@@ -865,6 +879,81 @@ go build ./go_parallel_trace.go && hyperfine -r 5 -w 1 './go_parallel_trace meas
 go tool trace trace.prof
 ```
 
+### Parallel Version - More Easy Gains
+
+We can get the time down to 7s by moving a temporary array out of the inner loop (I didn't see that the whole time!) and making the channels non-blocking.
+
+So changing this:
+
+```go
+// We suppose the file is valid, without a single error.
+// Not a single error check is made.
+for len(content) > 0 {
+  station := [100]byte{}
+  ...
+}
+```
+
+to this
+
+```go
+station := [100]byte{}
+// We suppose the file is valid, without a single error.
+// Not a single error check is made.
+for len(content) > 0 {
+...
+}
+```
+
+And adding a `1` to the channel generations:
+
+```go
+for idx, chunk := range chunkList {
+  // blocking channels
+  channels[idx] = make(chan resultType)
+  go processChunk(chunk, file, channels[idx])
+}
+
+numSumChans := 2
+numToSum := numCPUs / numSumChans
+sumChannels := make([]chan resultType, numSumChans)
+
+for i := 0; i < numSumChans; i++ {
+  // blocking channels
+  sumChannels[i] = make(chan resultType)
+
+  go sumResults(channels[i*numToSum:(i+1)*numToSum], sumChannels[i])
+}
+```
+
+changed to:
+
+```go
+for idx, chunk := range chunkList {
+  // non blocking channels
+  channels[idx] = make(chan resultType, 1)
+  go processChunk(chunk, file, channels[idx])
+}
+
+numSumChans := 2
+numToSum := numCPUs / numSumChans
+sumChannels := make([]chan resultType, numSumChans)
+
+for i := 0; i < numSumChans; i++ {
+  // non-blocking channels
+  sumChannels[i] = make(chan resultType, 1)
+
+  go sumResults(channels[i*numToSum:(i+1)*numToSum], sumChannels[i])
+}
+```
+
+```shell
+hyperfine -r 5 -w 1 './go_parallel_III measurements.txt > solution.txt'
+Benchmark 1: ./go_parallel_III measurements.txt > solution.txt
+  Time (mean ± σ):      7.081 s ±  0.087 s    [User: 54.772 s, System: 4.913 s]
+  Range (min … max):    6.984 s …  7.169 s    5 runs
+```
+
 When the browser displays the trace, select "View trace by proc".
 
 This is the overview of the whole process, from start to end. We see, that it takes some time to read the data file, and takes a bit of time to sum the results. But most of the time, all cores are busy.
@@ -1008,6 +1097,7 @@ For details see [Benchmarks](#benchmarks)
 - [./go_parallel.go](./go_parallel.go): the same as above, but using "num cores" threads to process the data.
 - [./go_parallel_thread_factor.go](./go_parallel_thread_factor.go): the same as above, but using 2 * "num cores" to process the data.
 - [./go_parallel_II.go](./go_parallel_II.go): same as above, but using 20 * "num cores" to process the data and 2 threads to sum the results.
+- [./go_parallel_III.go](./go_parallel_III.go): same as above, but moving the generation of the temporary name array out of the inner loop and using non-blocking channels.
 
 | Program                                 | Time |
 | --------------------------------------- | ---- |
@@ -1027,6 +1117,7 @@ For details see [Benchmarks](#benchmarks)
 | go_parallel.go                          | 10s  |
 | go_parallel_thread_factor.go            | 8s   |
 | go_parallel_II.go                       | 7.3s |
+| go_parallel_III.go                      | 7.0s |
 
 ## Files
 
@@ -1045,6 +1136,7 @@ This is a description of the files in this repository and the generated files, w
 - [./go_parallel_thread_factor.go](./go_parallel_thread_factor.go): the same as above, but using 2 * "num cores" to process the data.
 - [./go_parallel_II.go](./go_parallel_II.go): same as above, but using 20 * "num cores" to process the data and 2 threads to sum the results.
 - [./go_parallel_trace.go](./go_parallel_trace.go): same as above, but with tracing enabled.
+- [./go_parallel_III.go](./go_parallel_III.go): same as above, but moving the generation of the temporary name array out of the inner loop and using non-blocking channels.
 
 ### Data and Java Reference Implementation
 
