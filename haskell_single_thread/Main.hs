@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- SPDX-FileCopyrightText:  Copyright 2024 Roland Csaszar
 -- SPDX-License-Identifier: MIT
 --
@@ -17,7 +18,8 @@ import Data.ByteString.Char8 qualified as BS
 import Data.Char (Char, ord)
 import Data.Foldable (traverse_)
 import Data.HashMap.Strict qualified as HM
-import Data.List (sort, splitAt)
+import Data.List (sort, uncons)
+import Data.Maybe (fromMaybe)
 import Data.Text.Encoding qualified as TE
 import Data.Word (Word64)
 import GHC.Float (roundDouble)
@@ -120,9 +122,9 @@ main = do
 
   let keys = sort (HM.keys ma)
   T.printf "{"
-  let (e1, els) = splitAt 1 keys
-  let i1 = HM.findWithDefault 0 (head e1) ma
-  let name1 = TE.decodeUtf8 (head e1)
+  let (e1, els) = fromMaybe ("", []) $ uncons keys
+  let i1 = HM.findWithDefault 0 e1 ma
+  let name1 = TE.decodeUtf8 e1
   count1 <- A.readArray rC i1
   sum1 <- A.readArray rS i1
   tMin1 <- A.readArray rM i1
