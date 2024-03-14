@@ -39,6 +39,7 @@ The results as a table: [Results](#results)
   - [Further Optimization](#further-optimization)
 - [Haskell Benchmarks](#haskell-benchmarks)
   - [Optimized Single Thread Version](#optimized-single-thread-version)
+  - [Single Threaded Version Using Hash Table by András Kovács](#single-threaded-version-using-hash-table-by-andrás-kovács)
 - [Comparison](#comparison)
   - [wc](#wc)
   - [Java Reference Implementation](#java-reference-implementation)
@@ -258,6 +259,19 @@ The Haskell executables can either be build using Stack, like is documented here
     ```
 
 4. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
+5. Compile and benchmark the single threaded Haskell version using András Kovács' hash table:
+
+    ```shell
+    stack install :haskell_single_h --local-bin-path ./
+    hyperfine -r 5 -w 1 './haskell_single_h measurements.txt > solution.txt'
+    ```
+
+6. Compare the generated output file with the "official" output file:
 
    ```shell
    diff correct_results.txt ./solution.txt
@@ -1031,6 +1045,19 @@ Benchmark 1: ./haskell_single_I measurements.txt > solution.txt
   Range (min … max):   97.067 s … 99.148 s    5 runs
 ```
 
+### Single Threaded Version Using Hash Table by András Kovács
+
+To emphasize the importance of using the right hash map: just by using the hash table implementation by András Kovács, I'm able to speed the program up 2.6 times, to 38s instead of 98s!
+
+Details see [Thread](https://discourse.haskell.org/t/one-billion-row-challenge-in-hs/8946/141) and [Gist - GitHub](https://gist.github.com/AndrasKovacs/e156ae66b8c28b1b84abe6b483ea20ec)
+
+```shell
+hyperfine -w 1 -r 5  './haskell_single_h measurements.txt > solution.txt'
+Benchmark 1: ./haskell_single_h measurements.txt > solution.txt
+  Time (mean ± σ):     37.844 s ±  0.069 s    [User: 33.444 s, System: 6.423 s]
+  Range (min … max):   37.756 s … 37.927 s    5 runs
+```
+
 ## Comparison
 
 ### wc
@@ -1163,6 +1190,8 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 - [./go_parallel_II.go](./go_parallel_II.go): same as above, but using 20 * "num cores" to process the data and 2 threads to sum the results.
 - [./go_parallel_III.go](./go_parallel_III.go): same as above, but moving the generation of the temporary name array out of the inner loop and using non-blocking channels.
 - [./haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs): the first single threaded Haskell version. Already optimized.
+- [./haskell_single_hash/Main.hs](./haskell_single_hash/Main.hs): as above, but using András Kovács hash table implementation.
+
 
 | Program                                 | Time |
 | --------------------------------------- | ---- |
@@ -1172,7 +1201,7 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 | Go Alexander Yastrebov                  | 4s   |
 | Go Shraddha Agrawal                     | 12s  |
 | Go Ben Hoyt*                            | 75s  |
-| haskell_single_I                        | 98s  |
+| ./haskell_single_thread/Main.hs         | 98s  |
 | go_single_thread.go                     | 98s  |
 | go_single_thread_arrays.go              | 71s  |
 | go_single_thread_arrays_64bit_ints.go   | 68s  |
@@ -1180,6 +1209,7 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 | go_single_thread_single_parse_II.go     | 56s  |
 | go_single_thread_parsing.go             | 52s  |
 | go_parallel_preparation.go              | 49s  |
+| ./haskell_single_hash/Main.hs           | 38s  |
 | go_parallel.go                          | 10s  |
 | go_parallel_thread_factor.go            | 8s   |
 | go_parallel_II.go                       | 7.3s |
@@ -1204,6 +1234,7 @@ This is a description of the files in this repository and the generated files, w
 - [./go_parallel_trace.go](./go_parallel_trace.go): same as above, but with tracing enabled.
 - [./go_parallel_III.go](./go_parallel_III.go): same as above, but moving the generation of the temporary name array out of the inner loop and using non-blocking channels.
 - [./haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs): the first single threaded Haskell version. Already optimized.
+- [./haskell_single_hash/Main.hs](./haskell_single_hash/Main.hs): as above, but using András Kovács hash table implementation.
 
 ### Data and Java Reference Implementation
 

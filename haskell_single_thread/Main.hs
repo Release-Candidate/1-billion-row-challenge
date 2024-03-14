@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 -- SPDX-FileCopyrightText:  Copyright 2024 Roland Csaszar
 -- SPDX-License-Identifier: MIT
 --
@@ -7,6 +6,7 @@
 -- Date:     12.Mar.2024
 --
 --------------------------------------------------------------------------------
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE ViewPatterns #-}
 
