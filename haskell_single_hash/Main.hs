@@ -1,4 +1,3 @@
-{-# LANGUAGE BlockArguments #-}
 -- SPDX-FileCopyrightText:  Copyright 2024 Roland Csaszar
 -- SPDX-License-Identifier: MIT
 --
@@ -7,6 +6,7 @@
 -- Date:     14.Mar.2024
 --
 --------------------------------------------------------------------------------
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -26,7 +26,7 @@ import Data.ByteString.Internal qualified as BSI (
  )
 import Data.Char (Char, ord)
 import Data.Foldable (traverse_)
-import Data.HashMap.Strict qualified as HM
+import Data.HashMap.Strict qualified as HM ()
 import Data.List (sort, uncons)
 import Data.Maybe (fromMaybe)
 import Data.Primitive (
@@ -79,7 +79,6 @@ import GHC.Base (
  )
 import GHC.Float (roundDouble)
 import GHC.IO (unsafeDupablePerformIO)
-import GHC.Show (Show)
 import System.Environment (getArgs)
 import System.IO.MMap qualified as M
 import Text.Printf qualified as TP (perror, printf)
