@@ -1,4 +1,5 @@
 -- SPDX-FileCopyrightText:  Copyright 2024 Roland Csaszar
+-- SPDX-FileCopyrightText:  Copyright 2024 András Kovács
 -- SPDX-License-Identifier: MIT
 --
 -- Project:  1-billion-row-challenge
