@@ -36,3 +36,4 @@ dist-newstyle/
 .stack-work/
 haskell_single_I
 haskell_single_h
+haskell_single_b

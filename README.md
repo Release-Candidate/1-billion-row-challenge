@@ -40,6 +40,7 @@ The results as a table: [Results](#results)
 - [Haskell Benchmarks](#haskell-benchmarks)
   - [Optimized Single Thread Version](#optimized-single-thread-version)
   - [Single Threaded Version Using Hash Table by András Kovács](#single-threaded-version-using-hash-table-by-andrás-kovács)
+  - [Adding Strictness](#adding-strictness)
 - [Comparison](#comparison)
   - [wc](#wc)
   - [Java Reference Implementation](#java-reference-implementation)
@@ -272,6 +273,19 @@ The Haskell executables can either be build using Stack, like is documented here
     ```
 
 6. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
+7. Compile and benchmark the single threaded Haskell version with additional strictness annotations:
+
+    ```shell
+    stack install :haskell_single_b --local-bin-path ./
+    hyperfine -r 5 -w 1 './haskell_single_b measurements.txt > solution.txt'
+    ```
+
+8. Compare the generated output file with the "official" output file:
 
    ```shell
    diff correct_results.txt ./solution.txt
@@ -1058,6 +1072,17 @@ Benchmark 1: ./haskell_single_h measurements.txt > solution.txt
   Range (min … max):   37.756 s … 37.927 s    5 runs
 ```
 
+### Adding Strictness
+
+By sprinkling strictness annotations - `!` - the runtime can be decreased by another 1.5s to 36.5s.
+
+```shell
+hyperfine -r 5 -w 1 './haskell_single_b measurements.txt > solution.txt'
+Benchmark 1: ./haskell_single_b measurements.txt > solution.txt
+  Time (mean ± σ):     36.492 s ±  0.057 s    [User: 32.019 s, System: 6.497 s]
+  Range (min … max):   36.394 s … 36.545 s    5 runs
+```
+
 ## Comparison
 
 ### wc
@@ -1191,29 +1216,30 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 - [./go_parallel_III.go](./go_parallel_III.go): same as above, but moving the generation of the temporary name array out of the inner loop and using non-blocking channels.
 - [./haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs): the first single threaded Haskell version. Already optimized.
 - [./haskell_single_hash/Main.hs](./haskell_single_hash/Main.hs): as above, but using András Kovács hash table implementation.
+- [./haskell_single_bang/Main.hs](./haskell_single_bang/Main.hs): as above, but using strictness annotations - `!`.
 
-
-| Program                                 | Time |
-| --------------------------------------- | ---- |
-| wc -l                                   | 17s  |
-| awk.awk                                 | 600s |
-| Java Reference Implementation           | 220s |
-| Go Alexander Yastrebov                  | 4s   |
-| Go Shraddha Agrawal                     | 12s  |
-| Go Ben Hoyt*                            | 75s  |
-| ./haskell_single_thread/Main.hs         | 98s  |
-| go_single_thread.go                     | 98s  |
-| go_single_thread_arrays.go              | 71s  |
-| go_single_thread_arrays_64bit_ints.go   | 68s  |
-| go_single_thread_arrays_single_parse.go | 65s  |
-| go_single_thread_single_parse_II.go     | 56s  |
-| go_single_thread_parsing.go             | 52s  |
-| go_parallel_preparation.go              | 49s  |
-| ./haskell_single_hash/Main.hs           | 38s  |
-| go_parallel.go                          | 10s  |
-| go_parallel_thread_factor.go            | 8s   |
-| go_parallel_II.go                       | 7.3s |
-| go_parallel_III.go                      | 7.0s |
+| Program                                 | Time  |
+| --------------------------------------- | ----- |
+| wc -l                                   | 17s   |
+| awk.awk                                 | 600s  |
+| Java Reference Implementation           | 220s  |
+| Go Alexander Yastrebov                  | 4s    |
+| Go Shraddha Agrawal                     | 12s   |
+| Go Ben Hoyt*                            | 75s   |
+| ./haskell_single_thread/Main.hs         | 98s   |
+| go_single_thread.go                     | 98s   |
+| go_single_thread_arrays.go              | 71s   |
+| go_single_thread_arrays_64bit_ints.go   | 68s   |
+| go_single_thread_arrays_single_parse.go | 65s   |
+| go_single_thread_single_parse_II.go     | 56s   |
+| go_single_thread_parsing.go             | 52s   |
+| go_parallel_preparation.go              | 49s   |
+| ./haskell_single_hash/Main.hs           | 38s   |
+| ./haskell_single_bang/Main.hs           | 36.5s |
+| go_parallel.go                          | 10s   |
+| go_parallel_thread_factor.go            | 8s    |
+| go_parallel_II.go                       | 7.3s  |
+| go_parallel_III.go                      | 7.0s  |
 
 ## Files
 
@@ -1235,6 +1261,7 @@ This is a description of the files in this repository and the generated files, w
 - [./go_parallel_III.go](./go_parallel_III.go): same as above, but moving the generation of the temporary name array out of the inner loop and using non-blocking channels.
 - [./haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs): the first single threaded Haskell version. Already optimized.
 - [./haskell_single_hash/Main.hs](./haskell_single_hash/Main.hs): as above, but using András Kovács hash table implementation.
+- [./haskell_single_bang/Main.hs](./haskell_single_bang/Main.hs): as above, but using strictness annotations - `!`.
 
 ### Data and Java Reference Implementation
 
