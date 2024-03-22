@@ -295,6 +295,8 @@ The Haskell executables can either be build using Stack, like is documented here
 
 Official Java implementations: [1BRC - Results](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#results)
 
+Fortran (90) implementation: [Emir Uz - 1BRC](https://github.com/emiruz/1brc/tree/main)
+
 Other implementations mentioned on the 1BRC site: [1BRC on the Web](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#1brc-on-the-web)
 
 ### Using Go
@@ -1203,6 +1205,7 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 - `Go Alexander Yastrebov`: fastest Go version of [1BRC - Go](https://github.com/gunnarmorling/1brc/blob/main/src/main/go/AlexanderYastrebov/calc.go)
 - `Go Shraddha Agrawal`: fasted Version of [One Billion Rows Challenge in Golang](https://www.bytesizego.com/blog/one-billion-row-challenge-go)
 - `Go Ben Hoyt`: does not produce the correct output, fastest version of [The One Billion Row Challenge in Go: from 1m45s to 4s in nine solutions](https://benhoyt.com/writings/go-1brc/).
+- Fortran Emir Uz: see [Emir Uz - 1BRC](https://github.com/emiruz/1brc/tree/main)
 - [./go_single_thread.go](./go_single_thread.go): my baseline Go version, single threaded and using a map of structures.
 - [./go_single_thread_arrays.go](./go_single_thread_arrays.go): my baseline Go version, single threaded and using an array of structures.
 - [./go_single_thread_arrays_64bit_ints.go](./go_single_thread_arrays_64bit_ints.go) the same as above, but using 64 bit integers to hold all temperature data (minimum and maximum values too).
@@ -1224,6 +1227,7 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 | awk.awk                                 | 600s  |
 | Java Reference Implementation           | 220s  |
 | Go Alexander Yastrebov                  | 4s    |
+| Fortran Emir Uz                         | 3.5s  |
 | Go Shraddha Agrawal                     | 12s   |
 | Go Ben Hoyt*                            | 75s   |
 | ./haskell_single_thread/Main.hs         | 98s   |
