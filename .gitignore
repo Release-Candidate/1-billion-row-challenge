@@ -6,6 +6,8 @@ solution*.txt
 
 # profiling data
 cpu.prof
+mem.prof
+trace.prof
 
 # local helper script
 run_all.sh
@@ -30,10 +32,12 @@ go_parallel_preparation
 go_parallel
 go_parallel_thread_factor
 go_parallel_II
-trace.prof
+go_parallel_xx
 go_parallel_III
 dist-newstyle/
 .stack-work/
 haskell_single_I
 haskell_single_h
 haskell_single_b
+go_parallel_trace
+go_parallel_fnv

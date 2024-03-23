@@ -1205,7 +1205,7 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 - `Go Alexander Yastrebov`: fastest Go version of [1BRC - Go](https://github.com/gunnarmorling/1brc/blob/main/src/main/go/AlexanderYastrebov/calc.go)
 - `Go Shraddha Agrawal`: fasted Version of [One Billion Rows Challenge in Golang](https://www.bytesizego.com/blog/one-billion-row-challenge-go)
 - `Go Ben Hoyt`: does not produce the correct output, fastest version of [The One Billion Row Challenge in Go: from 1m45s to 4s in nine solutions](https://benhoyt.com/writings/go-1brc/).
-- Fortran Emir Uz: see [Emir Uz - 1BRC](https://github.com/emiruz/1brc/tree/main)
+- `Fortran Emir Uz`: see [Emir Uz - 1BRC](https://github.com/emiruz/1brc/tree/main)
 - [./go_single_thread.go](./go_single_thread.go): my baseline Go version, single threaded and using a map of structures.
 - [./go_single_thread_arrays.go](./go_single_thread_arrays.go): my baseline Go version, single threaded and using an array of structures.
 - [./go_single_thread_arrays_64bit_ints.go](./go_single_thread_arrays_64bit_ints.go) the same as above, but using 64 bit integers to hold all temperature data (minimum and maximum values too).
