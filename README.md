@@ -4,7 +4,7 @@ This is my take on the one billion row challenge: [gunnarmorling/1brc at Github]
 
 ## Go vs. Haskell
 
-These are my steps from the [first, single thread Go version](./go_single_thread.go) that took 100s to run, to the [last, multi-threaded Go version](./go_parallel_fnv.go) which takes about 3.3s.
+These are my steps from the [first, single thread Go version](./go_single_thread.go) that took 100s to run, to the [last, multi-threaded Go version](./go_parallel_eq.go) which takes about 3.2s.
 
 And the evolution of the Haskell version, starting at 100s too - but this is already an optimized version, comparable to the fastest single threaded Go version. The development of this version happened because and with ideas from this thread: [One Billion Row challenge in Hs](https://discourse.haskell.org/t/one-billion-row-challenge-in-hs/8946/108).
 
@@ -37,6 +37,7 @@ The results as a table: [Results](#results)
   - [Parallel Version - Tracing](#parallel-version---tracing)
   - [Parallel Version - More Easy Gains](#parallel-version---more-easy-gains)
   - [Using FNV Hash Function and Mmap](#using-fnv-hash-function-and-mmap)
+  - [Less Threads and bytes.Equal](#less-threads-and-bytesequal)
 - [Haskell Benchmarks](#haskell-benchmarks)
   - [Optimized Single Thread Version](#optimized-single-thread-version)
   - [Single Threaded Version Using Hash Table by András Kovács](#single-threaded-version-using-hash-table-by-andrás-kovács)
@@ -243,6 +244,19 @@ Btw. `mean` here is the sum of all values divided by the number of values (the "
     ```
 
 24. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
+25. Compile and benchmark the parallel Go version using less threads and `bytes.Equal`:
+
+    ```shell
+    go build ./go_parallel_eq.go
+    hyperfine -r 5 -w 1 './go_parallel_eq measurements.txt > solution.txt'
+    ```
+
+26. Compare the generated output file with the "official" output file:
 
    ```shell
    diff correct_results.txt ./solution.txt
@@ -1075,6 +1089,31 @@ Benchmark 1: ./go_parallel_fnv measurements.txt > solution.txt
   Range (min … max):    3.261 s …  3.284 s    5 runs
 ```
 
+### Less Threads and bytes.Equal
+
+Using less threads and `bytes.Equal`, we get a runtime of 3.2s.
+
+So using
+
+```go
+bytes.Equal(station[:semiColonIdx], []byte(stationIdxMap[i].Station))
+```
+
+instead of
+
+```go
+string(station[:semiColonIdx]) == stationIdxMap[i].Station
+```
+
+and only 1/10th of the threads as before, now only 2 times the number of cores:
+
+```shell
+hyperfine -r 5 -w 1 './go_parallel_eq measurements.txt > solution.txt'
+Benchmark 1: ./go_parallel_eq measurements.txt > solution.txt
+  Time (mean ± σ):      3.204 s ±  0.010 s    [User: 29.011 s, System: 1.319 s]
+  Range (min … max):    3.192 s …  3.218 s    5 runs
+```
+
 ## Haskell Benchmarks
 
 All of this is running on my Apple M1 Max (Studio) with 32GB of RAM.
@@ -1258,6 +1297,7 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 - [./go_parallel_II.go](./go_parallel_II.go): same as above, but using 20 * "num cores" to process the data and 2 threads to sum the results.
 - [./go_parallel_III.go](./go_parallel_III.go): same as above, but moving the generation of the temporary name array out of the inner loop and using non-blocking channels.
 - [./go_parallel_fnv.go](./go_parallel_fnv.go): same as above, but using the FNV hash function and `mmap`.
+- [./go_parallel_eq.go](./go_parallel_eq.go): same as above, but using `bytes.Equal` and 1/10 of the threads as before.
 - [./haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs): the first single threaded Haskell version. Already optimized.
 - [./haskell_single_hash/Main.hs](./haskell_single_hash/Main.hs): as above, but using András Kovács hash table implementation.
 - [./haskell_single_bang/Main.hs](./haskell_single_bang/Main.hs): as above, but using strictness annotations - `!`.
@@ -1286,6 +1326,7 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 | go_parallel_II.go                       | 7.3s  |
 | go_parallel_III.go                      | 7.0s  |
 | go_parallel_fnv.go                      | 3.3s  |
+| go_parallel_eq.go                       | 3.2s  |
 
 ## Files
 
@@ -1306,6 +1347,7 @@ This is a description of the files in this repository and the generated files, w
 - [./go_parallel_trace.go](./go_parallel_trace.go): same as above, but with tracing enabled.
 - [./go_parallel_III.go](./go_parallel_III.go): same as above, but moving the generation of the temporary name array out of the inner loop and using non-blocking channels.
 - [./go_parallel_fnv.go](./go_parallel_fnv.go): same as above, but using the FNV hash function and `mmap`.
+- [./go_parallel_eq.go](./go_parallel_eq.go): same as above, but using `bytes.Equal` and 1/10 of the threads as before.
 - [./haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs): the first single threaded Haskell version. Already optimized.
 - [./haskell_single_hash/Main.hs](./haskell_single_hash/Main.hs): as above, but using András Kovács hash table implementation.
 - [./haskell_single_bang/Main.hs](./haskell_single_bang/Main.hs): as above, but using strictness annotations - `!`.

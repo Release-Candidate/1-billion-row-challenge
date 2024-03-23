@@ -41,3 +41,4 @@ haskell_single_h
 haskell_single_b
 go_parallel_trace
 go_parallel_fnv
+go_parallel_eq
