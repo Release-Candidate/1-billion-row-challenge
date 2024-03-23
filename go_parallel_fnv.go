@@ -59,7 +59,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Error: no data file to process given! Exiting.")
 		os.Exit(1)
 	}
-	numCPUs := 20 * runtime.NumCPU()
+	numCPUs := 10 * runtime.NumCPU()
 	fileName := os.Args[1]
 
 	// f, err := os.Create("cpu.prof")
@@ -68,6 +68,13 @@ func main() {
 	// }
 	// pprof.StartCPUProfile(f)
 	// defer pprof.StopCPUProfile()
+
+	// f1, err := os.Create("trace.prof")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// trace.Start(f1)
+	// defer trace.Stop()
 
 	file, err := os.Open(fileName)
 	if err != nil {
