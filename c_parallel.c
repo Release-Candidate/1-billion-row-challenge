@@ -168,6 +168,59 @@ void* process_chunk(void* thread_data) {
   return result;
 }
 
+void sum_results(size_t num_threads,
+                 pthread_t* thread,
+                 MapStruct* sum_idx_map,
+                 StationTemperatures* sum_data) {
+  size_t station_idx = 0;
+  for (size_t thread_id = 0; thread_id < num_threads; thread_id++) {
+    Result const* result = 0;
+    int ret_val = pthread_join(thread[thread_id], (void**)&result);
+    if (ret_val != 0) {
+      fprintf(stderr, "Error joining thread: %s\n", strerror(ret_val));
+      exit(EXIT_FAILURE);
+    }
+    for (size_t res_idx = 0; res_idx < MASK + 1; res_idx++) {
+      MapStruct station = result->idx_map[res_idx];
+      if (station.name[0] == 0) {
+        continue;
+      }
+      size_t idx = station.idx;
+      uint32_t name_hash = fnv_hash(station.name);
+      for (size_t i = name_hash; i < MASK + 1; i++) {
+        if (sum_idx_map[i].name[0] == 0) {
+          sum_idx_map[i].idx = station_idx;
+          memcpy(sum_idx_map[i].name, station.name, 100);
+          sum_data->temp_sum[station_idx] = result->temp.temp_sum[idx];
+          sum_data->count[station_idx] = result->temp.count[idx];
+          sum_data->min[station_idx] = result->temp.min[idx];
+          sum_data->max[station_idx] = result->temp.max[idx];
+          station_idx++;
+          break;
+        }
+        if (strcmp(sum_idx_map[i].name, station.name) == 0) {
+          size_t st_idx = sum_idx_map[i].idx;
+          sum_data->temp_sum[st_idx] += result->temp.temp_sum[idx];
+          sum_data->count[st_idx] += result->temp.count[idx];
+          sum_data->min[st_idx] = sum_data->min[st_idx] > result->temp.min[idx]
+                                      ? result->temp.min[idx]
+                                      : sum_data->min[st_idx];
+          sum_data->max[st_idx] = sum_data->max[st_idx] < result->temp.max[idx]
+                                      ? result->temp.max[idx]
+                                      : sum_data->max[st_idx];
+          break;
+        }
+      }
+    }
+    free((void*)result->temp.temp_sum);
+    free((void*)result->temp.count);
+    free((void*)result->temp.min);
+    free((void*)result->temp.max);
+    free((void*)result->idx_map);
+    free((void*)result);
+  }
+}
+
 int compare(void const* a, void const* b) {
   char const* str_a = ((MapStruct const*)a)->name;
   char const* str_b = ((MapStruct const*)b)->name;
@@ -219,59 +272,6 @@ void print_results(MapStruct* sum_idx_map, StationTemperatures const sum_data) {
     }
   }
   printf("}\n");
-}
-
-void sum_data_f(size_t num_threads,
-                pthread_t* thread,
-                MapStruct* sum_idx_map,
-                StationTemperatures* sum_data) {
-  size_t station_idx = 0;
-  for (size_t thread_id = 0; thread_id < num_threads; thread_id++) {
-    Result const* result = 0;
-    int ret_val = pthread_join(thread[thread_id], (void**)&result);
-    if (ret_val != 0) {
-      fprintf(stderr, "Error joining thread: %s\n", strerror(ret_val));
-      exit(EXIT_FAILURE);
-    }
-    for (size_t res_idx = 0; res_idx < MASK + 1; res_idx++) {
-      MapStruct station = result->idx_map[res_idx];
-      if (station.name[0] == 0) {
-        continue;
-      }
-      size_t idx = station.idx;
-      uint32_t name_hash = fnv_hash(station.name);
-      for (size_t i = name_hash; i < MASK + 1; i++) {
-        if (sum_idx_map[i].name[0] == 0) {
-          sum_idx_map[i].idx = station_idx;
-          memcpy(sum_idx_map[i].name, station.name, 100);
-          sum_data->temp_sum[station_idx] = result->temp.temp_sum[idx];
-          sum_data->count[station_idx] = result->temp.count[idx];
-          sum_data->min[station_idx] = result->temp.min[idx];
-          sum_data->max[station_idx] = result->temp.max[idx];
-          station_idx++;
-          break;
-        }
-        if (strcmp(sum_idx_map[i].name, station.name) == 0) {
-          size_t st_idx = sum_idx_map[i].idx;
-          sum_data->temp_sum[st_idx] += result->temp.temp_sum[idx];
-          sum_data->count[st_idx] += result->temp.count[idx];
-          sum_data->min[st_idx] = sum_data->min[st_idx] > result->temp.min[idx]
-                                      ? result->temp.min[idx]
-                                      : sum_data->min[st_idx];
-          sum_data->max[st_idx] = sum_data->max[st_idx] < result->temp.max[idx]
-                                      ? result->temp.max[idx]
-                                      : sum_data->max[st_idx];
-          break;
-        }
-      }
-    }
-    free((void*)result->temp.temp_sum);
-    free((void*)result->temp.count);
-    free((void*)result->temp.min);
-    free((void*)result->temp.max);
-    free((void*)result->idx_map);
-    free((void*)result);
-  }
 }
 
 int main(int argc, char* argv[]) {
@@ -327,7 +327,7 @@ int main(int argc, char* argv[]) {
 
   free((void*)chunk_list);
 
-  sum_data_f(num_threads, thread, sum_idx_map, &sum_data);
+  sum_results(num_threads, thread, sum_idx_map, &sum_data);
 
   print_results(sum_idx_map, sum_data);
 
