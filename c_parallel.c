@@ -16,6 +16,7 @@
 #include <string.h>
 
 // Non-portable, Unix* specific.
+#include <pthread.h>
 #include <sys/mman.h>
 
 struct StationTemperatures_t {
@@ -37,6 +38,12 @@ struct MapStruct_t {
   size_t idx;
 };
 typedef struct MapStruct_t MapStruct;
+
+struct ThreadData_t {
+  char const* data;
+  size_t data_size;
+};
+typedef struct ThreadData_t ThreadData;
 
 struct Result_t {
   StationTemperatures temp;
@@ -71,20 +78,23 @@ Chunk const* generate_chunk_indices(size_t num_threads,
 
   size_t read_off = chunk_size;
   for (size_t cpu_idx = 1; cpu_idx < num_threads; cpu_idx++) {
-    char const* newline_ptr = memchr(data + read_off, '\n', 150);
+    char const* newline_ptr = memchr(&data[read_off], '\n', 150);
     if (newline_ptr == 0) {
       chunk_list[cpu_idx].end_idx = data_size - 1;
       break;
     }
-    chunk_list[cpu_idx - 1].end_idx = newline_ptr - data;
-    chunk_list[cpu_idx].start_idx = newline_ptr - data + 1;
+    size_t newline_idx = newline_ptr - data;
+    chunk_list[cpu_idx - 1].end_idx = newline_idx;
+    chunk_list[cpu_idx].start_idx = newline_idx + 1;
     chunk_list[cpu_idx].end_idx = data_size - 1;
     read_off += chunk_size;
   }
   return chunk_list;
 }
 
-Result const* process_chunk(char const* data, size_t data_size) {
+void* process_chunk(void* thread_data) {
+  char const* data = ((ThreadData*)thread_data)->data;
+  size_t data_size = ((ThreadData*)thread_data)->data_size;
   Result* result = calloc(1, sizeof *result);
   result->temp.count = calloc(10000, sizeof *result->temp.count);
   result->temp.temp_sum = calloc(10000, sizeof *result->temp.temp_sum);
@@ -96,14 +106,14 @@ Result const* process_chunk(char const* data, size_t data_size) {
   char station_name[100];
   char const* content = data;
   char const* data_end = data + data_size;
-  while (content < data_end) {
+  while (data_end - content > 0) {
     size_t semicolon_idx = 1;
     station_name[0] = content[0];
     char curr_byte = content[1];
     uint32_t name_hash = FNV_OFFSET_BASIS;
     while (curr_byte != ';') {
       station_name[semicolon_idx] = curr_byte;
-      name_hash ^= curr_byte;
+      name_hash ^= (uint32_t)curr_byte;
       name_hash *= FNV_PRIME;
       semicolon_idx++;
       curr_byte = content[semicolon_idx];
@@ -152,9 +162,9 @@ Result const* process_chunk(char const* data, size_t data_size) {
                                     : result->temp.max[idx];
         break;
       }
-
     }  // for i
-  }    // while content < data_end
+
+  }  // while content < data_end
   return result;
 }
 
@@ -211,6 +221,59 @@ void print_results(MapStruct* sum_idx_map, StationTemperatures const sum_data) {
   printf("}\n");
 }
 
+void sum_data_f(size_t num_threads,
+                pthread_t* thread,
+                MapStruct* sum_idx_map,
+                StationTemperatures* sum_data) {
+  size_t station_idx = 0;
+  for (size_t thread_id = 0; thread_id < num_threads; thread_id++) {
+    Result const* result = 0;
+    int ret_val = pthread_join(thread[thread_id], (void**)&result);
+    if (ret_val != 0) {
+      fprintf(stderr, "Error joining thread: %s\n", strerror(ret_val));
+      exit(EXIT_FAILURE);
+    }
+    for (size_t res_idx = 0; res_idx < MASK + 1; res_idx++) {
+      MapStruct station = result->idx_map[res_idx];
+      if (station.name[0] == 0) {
+        continue;
+      }
+      size_t idx = station.idx;
+      uint32_t name_hash = fnv_hash(station.name);
+      for (size_t i = name_hash; i < MASK + 1; i++) {
+        if (sum_idx_map[i].name[0] == 0) {
+          sum_idx_map[i].idx = station_idx;
+          memcpy(sum_idx_map[i].name, station.name, 100);
+          sum_data->temp_sum[station_idx] = result->temp.temp_sum[idx];
+          sum_data->count[station_idx] = result->temp.count[idx];
+          sum_data->min[station_idx] = result->temp.min[idx];
+          sum_data->max[station_idx] = result->temp.max[idx];
+          station_idx++;
+          break;
+        }
+        if (strcmp(sum_idx_map[i].name, station.name) == 0) {
+          size_t st_idx = sum_idx_map[i].idx;
+          sum_data->temp_sum[st_idx] += result->temp.temp_sum[idx];
+          sum_data->count[st_idx] += result->temp.count[idx];
+          sum_data->min[st_idx] = sum_data->min[st_idx] > result->temp.min[idx]
+                                      ? result->temp.min[idx]
+                                      : sum_data->min[st_idx];
+          sum_data->max[st_idx] = sum_data->max[st_idx] < result->temp.max[idx]
+                                      ? result->temp.max[idx]
+                                      : sum_data->max[st_idx];
+          break;
+        }
+      }
+    }
+    free((void*)result->temp.temp_sum);
+    free((void*)result->temp.count);
+    free((void*)result->temp.min);
+    free((void*)result->temp.max);
+    free((void*)result->idx_map);
+    free((void*)result);
+  }
+}
+
 int main(int argc, char* argv[]) {
   if (argc != 2) {
     fprintf(stderr, "Error: no data file to process given! Exiting.\n");
@@ -227,10 +290,10 @@ int main(int argc, char* argv[]) {
   long data_size = ftell(file);
   rewind(file);
 
-  size_t num_threads = 1;
+  size_t num_threads = 10;
   size_t chunk_size = data_size / num_threads;
 
-  char* data = mmap(NULL, data_size, PROT_READ, MAP_PRIVATE, fileno(file), 0);
+  char* data = mmap(NULL, data_size, PROT_READ, MAP_SHARED, fileno(file), 0);
   if (data == MAP_FAILED) {
     fprintf(stderr, "Error mapping file '%s':\n%s\n", file_name,
             strerror(errno));
@@ -240,9 +303,20 @@ int main(int argc, char* argv[]) {
   Chunk const* chunk_list =
       generate_chunk_indices(num_threads, data_size, data, chunk_size);
 
-  Result const* result = process_chunk(data, data_size);
+  pthread_t thread[num_threads];
+  ThreadData thread_data[num_threads];
 
-  free((void*)chunk_list);
+  for (size_t thread_id = 0; thread_id < num_threads; thread_id++) {
+    thread_data[thread_id].data = &data[chunk_list[thread_id].start_idx];
+    thread_data[thread_id].data_size =
+        chunk_list[thread_id].end_idx - chunk_list[thread_id].start_idx + 1;
+    int ret_val = pthread_create(&thread[thread_id], NULL, process_chunk,
+                                 (void*)&thread_data[thread_id]);
+    if (ret_val != 0) {
+      fprintf(stderr, "Error creating thread: %s\n", strerror(ret_val));
+      exit(EXIT_FAILURE);
+    }
+  }
 
   StationTemperatures sum_data;
   sum_data.temp_sum = calloc(10000, sizeof *sum_data.temp_sum);
@@ -251,8 +325,11 @@ int main(int argc, char* argv[]) {
   sum_data.max = calloc(10000, sizeof *sum_data.max);
   MapStruct* sum_idx_map = calloc((MASK + 1), sizeof *sum_idx_map);
 
-  print_results(result->idx_map, result->temp);
-  // print_results(sum_idx_map, sum_data);
+  free((void*)chunk_list);
+
+  sum_data_f(num_threads, thread, sum_idx_map, &sum_data);
+
+  print_results(sum_idx_map, sum_data);
 
   free((void*)sum_data.temp_sum);
   free((void*)sum_data.count);
