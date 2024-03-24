@@ -97,12 +97,12 @@ func main() {
 		go processChunk(chunk, file, channels[idx])
 	}
 
+	stationIdx := 0
 	for _, channel := range channels {
 		result := <-channel
 		stationData := result.Temps
 		stationIdxMap := result.IdxMap
 
-		stationIdx := 0
 		for station, idx := range stationIdxMap {
 			stIdx, ok := stationSumIdxMap[station]
 			if ok {

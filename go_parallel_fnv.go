@@ -133,12 +133,12 @@ func main() {
 	}
 	stationSumIdxMap := make([]mapStruct, mask+1)
 
+	stationIdx := 0
 	for _, channel := range sumChannels {
 		result := <-channel
 		stationData := result.Temps
 		stationIdxMap := result.IdxMap
 
-		stationIdx := 0
 		for _, station := range stationIdxMap {
 			if station.Station == "" {
 				continue
@@ -208,12 +208,12 @@ func sumResults(channels []chan resultType, result chan resultType) {
 
 	stationSumIdxMap := make([]mapStruct, mask+1)
 
+	stationIdx := 0
 	for _, channel := range channels {
 		result := <-channel
 		stationData := result.Temps
 		stationIdxMap := result.IdxMap
 
-		stationIdx := 0
 		for _, station := range stationIdxMap {
 			if station.Station == "" {
 				continue

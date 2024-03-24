@@ -89,6 +89,7 @@ func main() {
 	}
 	stationSumIdxMap := make(map[string]int, 10_000)
 
+	stationIdx := 0
 	for _, chunk := range chunkList {
 		buffer := make([]byte, chunk.EndIdx-chunk.StartIdx+1)
 		_, err = file.ReadAt(buffer, chunk.StartIdx)
@@ -99,7 +100,6 @@ func main() {
 		}
 		stationData, stationIdxMap := processChunk(buffer)
 
-		stationIdx := 0
 		for station, idx := range stationIdxMap {
 			stIdx, ok := stationSumIdxMap[station]
 			if ok {
