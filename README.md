@@ -2,20 +2,23 @@
 
 This is my take on the one billion row challenge: [gunnarmorling/1brc at Github](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#rules-and-limits)
 
-## Go vs. Haskell
+The benchmark results on my computer as a table: [Results](#results)
+
+## Go vs. Haskell vs. C
 
 These are my steps from the [first, single thread Go version](./go_single_thread.go) that took 100s to run, to the [last, multi-threaded Go version](./go_parallel_eq.go) which takes about 3.2s.
 
-And the evolution of the Haskell version, starting at 100s too - but this is already an optimized version, comparable to the fastest single threaded Go version. The development of this version happened because and with ideas from this thread: [One Billion Row challenge in Hs](https://discourse.haskell.org/t/one-billion-row-challenge-in-hs/8946/108).
+And the evolution of the Haskell version, starting at 100s too - but this is already an optimized version, comparable to the fastest single threaded Go version, so more or less double the time of the Go version. The development of this version happened because and with ideas from this thread: [One Billion Row challenge in Hs](https://discourse.haskell.org/t/one-billion-row-challenge-in-hs/8946/108).
 
-The results as a table: [Results](#results)
+At last I've ported the fastest Go version to C, which now runs at 2.5s - a speedup of about 25%.
 
-- [Go vs. Haskell](#go-vs-haskell)
+- [Go vs. Haskell vs. C](#go-vs-haskell-vs-c)
 - [Relevant Rules and Properties of the Data](#relevant-rules-and-properties-of-the-data)
   - [The Task](#the-task)
   - [Properties We Can Use to Our Advantage](#properties-we-can-use-to-our-advantage)
 - [How to Run the Go Versions](#how-to-run-the-go-versions)
 - [How to Run the Haskell Versions](#how-to-run-the-haskell-versions)
+- [How to Run the C Version](#how-to-run-the-c-version)
 - [Other Solutions](#other-solutions)
   - [Using Go](#using-go)
 - [Go Benchmarks](#go-benchmarks)
@@ -42,6 +45,8 @@ The results as a table: [Results](#results)
   - [Optimized Single Thread Version](#optimized-single-thread-version)
   - [Single Threaded Version Using Hash Table by András Kovács](#single-threaded-version-using-hash-table-by-andrás-kovács)
   - [Adding Strictness](#adding-strictness)
+  - [Giving Up](#giving-up)
+- [C Benchmarks](#c-benchmarks)
 - [Comparison](#comparison)
   - [wc](#wc)
   - [Java Reference Implementation](#java-reference-implementation)
@@ -49,6 +54,9 @@ The results as a table: [Results](#results)
   - [Go Solution by Shraddha Agrawal](#go-solution-by-shraddha-agrawal)
   - [Go Solution by Ben Hoyt](#go-solution-by-ben-hoyt)
   - [Go Solution by Alexander Yastrebov](#go-solution-by-alexander-yastrebov)
+  - [Fortran Solution by Emir Uz](#fortran-solution-by-emir-uz)
+  - [Haskell Solution by András Kovács](#haskell-solution-by-andrás-kovács)
+  - [Haskell Solution by Vladimir Shabanov](#haskell-solution-by-vladimir-shabanov)
 - [Results](#results)
 - [Files](#files)
   - [Data and Java Reference Implementation](#data-and-java-reference-implementation)
@@ -318,6 +326,36 @@ The Haskell executables can either be build using Stack, like is documented here
    diff correct_results.txt ./solution.txt
    ```
 
+## How to Run the C Version
+
+The C program [./c_parallel.c](./c_parallel.c) uses `mmap` to memory map the data file and `pthreads` as the threading library, so it does only work on (more or less) POSIX compatible OSes like Linux or MacOS, but not (directly) on Windows. It can be compiled using any C11 compiler, in my example I use clang, you can just swap `clang` with `gcc` in the commandline to use GCC instead.
+
+1. Generate the data file [./measurements.txt](./measurements.txt) by running the Python script [./create_measurements.py](./create_measurements.py) on the file [./weather_stations.csv](./weather_stations.csv):
+
+   ```shell
+   python3 ./create_measurements.py 1_000_000_000
+   ```
+
+   **Warning**: This script takes a long time to run and generates 15GB of data!
+2. Generate the "official" output file for your data file by running the 1BRC's baseline Java implementation (you need Java 21 installed on your machine):
+
+   ```shell
+   java CalculateAverage_baseline.java > correct_results.txt
+   ```
+
+3. Compile and benchmark the C version using [hyperfine](https://github.com/sharkdp/hyperfine):
+
+    ```shell
+    clang -std=c11 -Wall -O3  -march=native -o c_parallel c_parallel.c
+    hyperfine -r 5 -w 1 './c_parallel measurements.txt > solution.txt'
+    ```
+
+4. Compare the generated output file with the "official" output file:
+
+   ```shell
+   diff correct_results.txt ./solution.txt
+   ```
+
 ## Other Solutions
 
 Official Java implementations: [1BRC - Results](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#results)
@@ -353,7 +391,9 @@ Benchmark 1: ./go_single_thread measurements_big.txt > solution_big.txt
 
 ### Map of Records to Map of Indices into Arrays
 
-Turing the naive hash map of records
+Source: [./go_single_thread_arrays.go](./go_single_thread_arrays.go).
+
+Turning the naive hash map of records
 
 ```go
 type stationTemperature struct {
@@ -395,6 +435,8 @@ Benchmark 1: ./go_single_thread_arrays measurements.txt > solution.txt
 ```
 
 ### Integer Sizes of the Temperature Arrays
+
+Single: [./go_single_thread_arrays_64bit_ints.go](./go_single_thread_arrays_64bit_ints.go)
 
 Changing the integer sizes of the arrays holding the temperature data from 16 bits to 32 bits makes the program run a bit slower.
 
@@ -457,6 +499,8 @@ Benchmark 1: ./go_single_thread_arrays_64bit_ints measurements.txt > solution.tx
 
 ### Not Searching for the Newline Character, Not Parsing Twice
 
+Source: [./go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go).
+
 Shaving another 3s off the run time, now at 65s, by not parsing the temperature data twice.
 
 Turing this:
@@ -511,6 +555,8 @@ Benchmark 1: ./go_single_thread_arrays_single_parse measurements.txt > solution.
 
 ### Not Searching for the Semicolon, Not Parsing the Station Name Twice
 
+Source: [./go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go).
+
 Another 9s off by not parsing the station name twice, by not searching for the semicolon first. Now we are at 56s.
 
 Changing:
@@ -547,6 +593,8 @@ Benchmark 1: ./go_single_thread_single_parse_II measurements.txt > solution.txt
 
 ### Profiling
 
+Source: [./go_single_thread_profiling.go](./go_single_thread_profiling.go).
+
 Now is the time to profile the program to see, where the most time is spent.
 
 So we refactor everything out of the main loop, so that we got function names in the profile. And add the profiling stanza to write the data to the file `cpu.prof`.
@@ -560,7 +608,7 @@ pprof.StartCPUProfile(f)
 defer pprof.StopCPUProfile()
 ```
 
-See file [./go_single_thread_profiling.go](./go_single_thread_profiling.go).
+
 
 Compiling and running this executable generates the profile file `cpu.prof`:
 
@@ -683,6 +731,8 @@ ROUTINE ======================== main.addTemperatureData in /Users/roland/Docume
 ```
 
 ### Change the Parsing of the Station Name and Temperature
+
+Source: [./go_single_thread_parsing.go](./go_single_thread_parsing.go).
 
 Another 4s less - now at 52s - by changing the parsing from:
 
@@ -840,6 +890,8 @@ func roundJava(x float64) float64 {
 
 ### Parallelization - Preparation
 
+Source: [./go_parallel_preparation.go](./go_parallel_preparation.go).
+
 If you may have wondered, if reading the whole file at once really is the fastest solution, then here is the answer: no, it isn't. We can do better.
 
 I just wanted to change the file reading at the first step of the parallelization. In this version we read and process the file in "number of Cores" chunks and sum the results together. This - without any parallelization - is 3s faster than the `go_single_thread_parsing.go` solution, so the last single threaded version takes 49s - we have exactly halved the time of the first version.
@@ -888,6 +940,8 @@ Benchmark 1: ./go_parallel_preparation measurements.txt > solution.txt
 
 ### Parallel Version
 
+Source: [./go_parallel_thread_factor.go](./go_parallel_thread_factor.go).
+
 The first actual parallel version is much faster than the previous one, we now have a runtime of 10s, 1/5 of the previous and 1/10 of the initial version.
 
 ```shell
@@ -924,6 +978,8 @@ Benchmark 1: ./go_parallel_thread_factor measurements.txt > solution.txt
 
 ### Parallel Version - Parallel Summing
 
+Source: [./go_parallel_II.go](./go_parallel_II.go).
+
 Now we crank up the number of threads by setting the CPU-factor to 20 and use 2 threads to sum all results and then sum these two results in the main thread. This gives us about 700ms, so we are at 7.3s.
 
 ```go
@@ -956,6 +1012,8 @@ Benchmark 1: ./go_parallel_II measurements.txt > solution.txt
 
 ### Parallel Version - Tracing
 
+Source: [./go_parallel_trace.go](./go_parallel_trace.go).
+
 At the end, we take a look at the trace of our go-routines. First, we have to enable trace output in the file, to write the trace data to `trace.prof`:
 
 ```go
@@ -975,6 +1033,8 @@ go tool trace trace.prof
 ```
 
 ### Parallel Version - More Easy Gains
+
+Source [./go_parallel_III.go](./go_parallel_III.go).
 
 We can get the time down to 7s by moving a temporary array out of the inner loop (I didn't see that the whole time!) and making the channels non-blocking.
 
@@ -1060,6 +1120,8 @@ At the end we see the 2 threads that do the first summing `main.sumResults` and 
 
 ### Using FNV Hash Function and Mmap
 
+Source: [./go_parallel_fnv.go](./go_parallel_fnv.go).
+
 By using [FNV-1a](http://www.isthe.com/chongo/tech/comp/fnv/index.html) as the hash function with linear probing and `mmap` instead of reading the file "normally", we get more than 50% speedup are now reached a run time of 3.3s.
 
 FNV (-1a) is a simple hash function, the implementation is below:
@@ -1090,6 +1152,8 @@ Benchmark 1: ./go_parallel_fnv measurements.txt > solution.txt
 ```
 
 ### Less Threads and bytes.Equal
+
+Source: [./go_parallel_eq.go](./go_parallel_eq.go).
 
 Using less threads and `bytes.Equal`, we get a runtime of 3.2s.
 
@@ -1129,6 +1193,8 @@ The thread [One Billion Row challenge in Hs](https://discourse.haskell.org/t/one
 
 ### Optimized Single Thread Version
 
+Source [./haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs).
+
 The first Haskell version runs the benchmark in 98 seconds. This is equivalent to the optimized Go version [./go_single_thread_parsing.go](./go_single_thread_parsing.go), which has a runtime of 54s, so it is about twice as fast. This needs the same time as my baseline Go version, [go_single_thread.go](./go_single_thread.go).
 
 It reads the whole file at once, parses the station name and temperature of the current row, adds the station name in a hashmap together with an index into a record of 4 arrays, which contain the number of temperatures, the sum of temperatures, and the minimum and maximum temperature of each station idx.
@@ -1141,6 +1207,8 @@ Benchmark 1: ./haskell_single_I measurements.txt > solution.txt
 ```
 
 ### Single Threaded Version Using Hash Table by András Kovács
+
+Source [./haskell_single_hash/Main.hs](./haskell_single_hash/Main.hs).
 
 To emphasize the importance of using the right hash map: just by using the hash table implementation by András Kovács, I'm able to speed the program up 2.6 times, to 38s instead of 98s!
 
@@ -1155,6 +1223,8 @@ Benchmark 1: ./haskell_single_h measurements.txt > solution.txt
 
 ### Adding Strictness
 
+Source [./haskell_single_bang/Main.hs](./haskell_single_bang/Main.hs).
+
 By sprinkling strictness annotations - `!` - the runtime can be decreased by another 1.5s to 36.5s.
 
 ```shell
@@ -1162,6 +1232,32 @@ hyperfine -r 5 -w 1 './haskell_single_b measurements.txt > solution.txt'
 Benchmark 1: ./haskell_single_b measurements.txt > solution.txt
   Time (mean ± σ):     36.492 s ±  0.057 s    [User: 32.019 s, System: 6.497 s]
   Range (min … max):   36.394 s … 36.545 s    5 runs
+```
+
+### Giving Up
+
+I could not get my own Haskell version significantly faster by using FNV-1a as Hash and MMapping the data file - I just got down to 85s. To get more "speed" out of Haskell, I'd need to unbox way more values and add additional strictness in the right places - which is way more work than I'm willing to do for now.
+
+## C Benchmarks
+
+All of this is running on my Apple M1 Max (Studio) with 32GB of RAM.
+
+Detailed specs:
+
+- 10-core CPU with 8 performance cores and 2 efficiency cores
+- 24-core GPU
+- 16-core Neural Engine
+- 400GB/s memory bandwidth
+
+Source: [./c_parallel.c](./c_parallel.c).
+
+This is the same as the fastest parallel Go solution, using FNV-1a as hash, Mmapping and threads: 2.5s
+
+```shell
+hyperfine -r 5 -w 1 './c_parallel measurements.txt > solution.txt'
+Benchmark 1: ./c_parallel measurements_big.txt > solution_big.txt
+  Time (mean ± σ):      2.482 s ±  0.013 s    [User: 22.069 s, System: 1.376 s]
+  Range (min … max):    2.463 s …  2.494 s    5 runs
 ```
 
 ## Comparison
@@ -1179,6 +1275,8 @@ wc -l measurements.txt  14.95s user 1.20s system 95% cpu 16.857 total
 So there really are 1 billion rows in this file! It took about 17s just to count the lines (`\n` characters).
 
 ### Java Reference Implementation
+
+Source: [./CalculateAverage_baseline.java](./CalculateAverage_baseline.java).
 
 The official Java solution needs about 220s, 3.7 minutes (no, I did not care to run it more than once, like using `hyperfine`):
 
@@ -1274,9 +1372,41 @@ Benchmark 1: ./go_Alexander_Yastrebov measurements.txt > solution.txt
   Range (min … max):    4.003 s …  4.049 s    5 runs
 ```
 
+### Fortran Solution by Emir Uz
+
+See [Emir Uz - 1BRC](https://github.com/emiruz/1brc/tree/main).
+
+```shell
+% gfortran-13 -fprofile-use  -fopenmp-simd -fopenmp -march=native -ffast-math -O3 -o testf test.f90
+% hyperfine -w 1 -r 5  './testf  > solution.txt'
+Benchmark 1: ./testf > solution.txt
+  Time (mean ± σ):      3.369 s ±  0.025 s    [User: 30.444 s, System: 1.348 s]
+  Range (min … max):    3.347 s …  3.411 s    5 runs
+```
+
+### Haskell Solution by András Kovács
+
+This program needs about 3.6s, the Source it at this [Gist - AndrasKovacs/OneBRC.hs](https://gist.github.com/AndrasKovacs/e156ae66b8c28b1b84abe6b483ea20ec).
+
+```shell
+Benchmark 1: ./exe-exe > solution.txt
+  Time (mean ± σ):      3.596 s ±  0.032 s    [User: 28.265 s, System: 1.727 s]
+  Range (min … max):    3.567 s …  3.646 s    5 runs
+```
+
+### Haskell Solution by Vladimir Shabanov
+
+Haskell program by Vladimir Shabanov, source see [Gist - vshabanov/OneBRC.hs](https://gist.github.com/vshabanov/c34aedf388470402dc0a2eee1ffc062b).
+
+```shell
+Benchmark 1: ./exe-exe  > solution.txt
+  Time (mean ± σ):      4.307 s ±  0.021 s    [User: 37.089 s, System: 2.015 s]
+  Range (min … max):    4.276 s …  4.328 s    5 runs
+```
+
 ## Results
 
-For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskell-benchmarks)
+The benchmark results on my machine. For details see [Go Benchmarks](#go-benchmarks), [Haskell Benchmarks](#haskell-benchmarks) and [C Benchmarks](#c-benchmarks).
 
 - `wc -l`: the time `wc -l measurements.txt` takes. Just the number of lines.
 - [./awk.awk](./awk.awk): the time `gawk -f awk.awk measurements.txt > solution.txt` takes. A naive, single threaded GAWK implementation, does not produce correctly rounded output.
@@ -1301,32 +1431,36 @@ For details see [Go Benchmarks](#go-benchmarks) and [Haskell Benchmarks](#haskel
 - [./haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs): the first single threaded Haskell version. Already optimized.
 - [./haskell_single_hash/Main.hs](./haskell_single_hash/Main.hs): as above, but using András Kovács hash table implementation.
 - [./haskell_single_bang/Main.hs](./haskell_single_bang/Main.hs): as above, but using strictness annotations - `!`.
+- [./c_parallel.c](./c_parallel.c): fastest Go version [./go_parallel_eq.go](./go_parallel_eq.go) ported to C.
 
-| Program                                 | Time  |
-| --------------------------------------- | ----- |
-| wc -l                                   | 17s   |
-| awk.awk                                 | 600s  |
-| Java Reference Implementation           | 220s  |
-| Go Alexander Yastrebov                  | 4s    |
-| Fortran Emir Uz                         | 3.5s  |
-| Go Shraddha Agrawal                     | 12s   |
-| Go Ben Hoyt*                            | 75s   |
-| ./haskell_single_thread/Main.hs         | 98s   |
-| go_single_thread.go                     | 98s   |
-| go_single_thread_arrays.go              | 71s   |
-| go_single_thread_arrays_64bit_ints.go   | 68s   |
-| go_single_thread_arrays_single_parse.go | 65s   |
-| go_single_thread_single_parse_II.go     | 56s   |
-| go_single_thread_parsing.go             | 52s   |
-| go_parallel_preparation.go              | 49s   |
-| ./haskell_single_hash/Main.hs           | 38s   |
-| ./haskell_single_bang/Main.hs           | 36.5s |
-| go_parallel.go                          | 10s   |
-| go_parallel_thread_factor.go            | 8s    |
-| go_parallel_II.go                       | 7.3s  |
-| go_parallel_III.go                      | 7.0s  |
-| go_parallel_fnv.go                      | 3.3s  |
-| go_parallel_eq.go                       | 3.2s  |
+| Program                                                                                                          | Time  |
+| ---------------------------------------------------------------------------------------------------------------- | ----- |
+| wc -l                                                                                                            | 17s   |
+| [awk.awk](./awk.awk)                                                                                             | 600s  |
+| [Java Reference Implementation](./CalculateAverage_baseline.java)                                                | 220s  |
+| [Haskell Vladimir Shabanov](https://gist.github.com/vshabanov/c34aedf388470402dc0a2eee1ffc062b)                  | 4.3s  |
+| [Go Alexander Yastrebov](https://github.com/gunnarmorling/1brc/blob/main/src/main/go/AlexanderYastrebov/calc.go) | 4s    |
+| [Haskell András Kovács](https://gist.github.com/AndrasKovacs/e156ae66b8c28b1b84abe6b483ea20ec)                   | 3.6s  |
+| [Fortran Emir Uz](https://github.com/emiruz/1brc/tree/main)                                                      | 3.4s  |
+| [Go Shraddha Agrawal](https://github.com/shraddhaag/1brc)                                                        | 12s   |
+| [Go Ben Hoyt*](https://github.com/benhoyt/go-1brc/tree/master)                                                   | 75s   |
+| [haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs)                                                 | 98s   |
+| [go_single_thread.go](./go_single_thread.go)                                                                     | 98s   |
+| [go_single_thread_arrays.go](./go_single_thread_arrays.go)                                                       | 71s   |
+| [go_single_thread_arrays_64bit_ints.go](./go_single_thread_arrays_64bit_ints.go)                                 | 68s   |
+| [go_single_thread_arrays_single_parse.go](./go_single_thread_arrays_single_parse.go)                             | 65s   |
+| [go_single_thread_single_parse_II.go](./go_single_thread_single_parse_II.go)                                     | 56s   |
+| [go_single_thread_parsing.go](./go_single_thread_parsing.go)                                                     | 52s   |
+| [go_parallel_preparation.go](./go_parallel_preparation.go)                                                       | 49s   |
+| [haskell_single_hash/Main.hs](./haskell_single_hash/Main.hs)                                                     | 38s   |
+| [haskell_single_bang/Main.hs](./haskell_single_bang/Main.hs)                                                     | 36.5s |
+| [go_parallel.go](./go_parallel.go)                                                                               | 10s   |
+| [go_parallel_thread_factor.go](./go_parallel_thread_factor.go)                                                   | 8s    |
+| [go_parallel_II.go](./go_parallel_II.go)                                                                         | 7.3s  |
+| [go_parallel_III.go](./go_parallel_III.go)                                                                       | 7.0s  |
+| [go_parallel_fnv.go](./go_parallel_fnv.go)                                                                       | 3.3s  |
+| [go_parallel_eq.go](./go_parallel_eq.go)                                                                         | 3.2s  |
+| [c_parallel.c](./c_parallel.c)                                                                                   | 2.5s  |
 
 ## Files
 
@@ -1351,6 +1485,7 @@ This is a description of the files in this repository and the generated files, w
 - [./haskell_single_thread/Main.hs](./haskell_single_thread/Main.hs): the first single threaded Haskell version. Already optimized.
 - [./haskell_single_hash/Main.hs](./haskell_single_hash/Main.hs): as above, but using András Kovács hash table implementation.
 - [./haskell_single_bang/Main.hs](./haskell_single_bang/Main.hs): as above, but using strictness annotations - `!`.
+- [./c_parallel.c](./c_parallel.c): fastest Go version [./go_parallel_eq.go](./go_parallel_eq.go) ported to C.
 
 ### Data and Java Reference Implementation
 

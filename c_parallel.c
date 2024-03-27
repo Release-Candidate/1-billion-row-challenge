@@ -78,7 +78,9 @@ Chunk const* generate_chunk_indices(size_t num_threads,
 
   size_t read_off = chunk_size;
   for (size_t cpu_idx = 1; cpu_idx < num_threads; cpu_idx++) {
-    char const* newline_ptr = memchr(&data[read_off], '\n', 150);
+    char const* newline_ptr =
+        memchr(&data[read_off], '\n',
+               150);  // 150, as the station name is 100 bytes at most
     if (newline_ptr == 0) {
       chunk_list[cpu_idx].end_idx = data_size - 1;
       break;
@@ -95,7 +97,7 @@ Chunk const* generate_chunk_indices(size_t num_threads,
 void* process_chunk(void* thread_data) {
   char const* data = ((ThreadData*)thread_data)->data;
   size_t data_size = ((ThreadData*)thread_data)->data_size;
-  Result* result = calloc(1, sizeof *result);
+  Result* result = malloc(sizeof *result);
   result->temp.count = calloc(10000, sizeof *result->temp.count);
   result->temp.temp_sum = calloc(10000, sizeof *result->temp.temp_sum);
   result->temp.min = calloc(10000, sizeof *result->temp.min);
@@ -190,7 +192,7 @@ void sum_results(size_t num_threads,
       for (size_t i = name_hash; i < MASK + 1; i++) {
         if (sum_idx_map[i].name[0] == 0) {
           sum_idx_map[i].idx = station_idx;
-          memcpy(sum_idx_map[i].name, station.name, 100);
+          memcpy(sum_idx_map[i].name, station.name, sizeof sum_idx_map[i].name);
           sum_data->temp_sum[station_idx] = result->temp.temp_sum[idx];
           sum_data->count[station_idx] = result->temp.count[idx];
           sum_data->min[station_idx] = result->temp.min[idx];
