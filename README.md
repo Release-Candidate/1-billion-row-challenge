@@ -1,3 +1,6 @@
+> [!WARNING]
+> This repository has been moved to [Codeberg: 1 Billion Row Challenge](https://codeberg.org/Release-Candidate/1-billion-row-challenge)
+
 # 1 Billion Row Challenge
 
 This is my take on the one billion row challenge: [gunnarmorling/1brc at Github](https://github.com/gunnarmorling/1brc?tab=readme-ov-file#rules-and-limits)
